@@ -1,0 +1,171 @@
+use tauri::{command, AppHandle, State};
+use crate::database::{self, get_db_pool};
+use crate::git_analyzer::analyze_repository;
+use crate::models::{Repository, Commit, Statistics, TimeFilter};
+use anyhow::Result;
+use std::sync::Mutex;
+
+#[derive(Default)]
+pub struct AppState {
+    pub scanning: Mutex<bool>,
+}
+
+#[command]
+pub async fn add_repository(app_handle: AppHandle, path: String) -> Result<Repository, String> {
+    println!("Attempting to add repository: {}", path);
+    
+    let pool = get_db_pool(&app_handle).await.map_err(|e| {
+        eprintln!("Failed to get database pool: {}", e);
+        e.to_string()
+    })?;
+    
+    // Validate that it's a git repository
+    if !crate::git_analyzer::GitAnalyzer::is_valid_git_repo(&path) {
+        return Err("所选路径不是有效的 Git 仓库".to_string());
+    }
+    
+    let repository = database::add_repository(&pool, &path)
+        .await
+        .map_err(|e| {
+            eprintln!("Failed to add repository to database: {}", e);
+            if e.to_string().contains("UNIQUE constraint failed") {
+                "该仓库已经添加过了".to_string()
+            } else {
+                format!("添加仓库失败: {}", e)
+            }
+        })?;
+    
+    println!("Successfully added repository: {} with ID: {}", path, repository.id);
+    Ok(repository)
+}
+
+#[command]
+pub async fn remove_repository(app_handle: AppHandle, id: i64) -> Result<(), String> {
+    let pool = get_db_pool(&app_handle).await.map_err(|e| e.to_string())?;
+    
+    database::remove_repository(&pool, id)
+        .await
+        .map_err(|e| format!("删除仓库失败: {}", e))?;
+    
+    Ok(())
+}
+
+#[command]
+pub async fn get_repositories(app_handle: AppHandle) -> Result<Vec<Repository>, String> {
+    let pool = get_db_pool(&app_handle).await.map_err(|e| e.to_string())?;
+    
+    let repositories = database::get_repositories(&pool)
+        .await
+        .map_err(|e| format!("获取仓库列表失败: {}", e))?;
+    
+    Ok(repositories)
+}
+
+#[command]
+pub async fn scan_repository(
+    app_handle: AppHandle, 
+    repository_id: i64,
+    state: State<'_, AppState>
+) -> Result<i32, String> {
+    // Check if already scanning
+    {
+        let scanning = state.scanning.lock().unwrap();
+        if *scanning {
+            return Err("正在扫描中，请稍候...".to_string());
+        }
+    }
+
+    // Set scanning flag
+    {
+        let mut scanning = state.scanning.lock().unwrap();
+        *scanning = true;
+    }
+
+    let result = async {
+        let pool = get_db_pool(&app_handle).await?;
+        
+        // Get repository info
+        let repositories = database::get_repositories(&pool).await?;
+        let repository = repositories
+            .into_iter()
+            .find(|r| r.id == repository_id)
+            .ok_or_else(|| anyhow::anyhow!("Repository not found"))?;
+        
+        // Determine since when to analyze (only new commits since last scan)
+        let since = repository.last_scanned;
+        
+        // Analyze commits
+        let commits = analyze_repository(repository.clone(), since)?;
+        let commit_count = commits.len() as i32;
+        
+        // Save to database
+        if !commits.is_empty() {
+            database::save_commits(&pool, &commits).await?;
+        }
+        
+        // Update last scanned time
+        database::update_repository_scan_time(&pool, repository_id).await?;
+        
+        Ok(commit_count)
+    }.await;
+
+    // Clear scanning flag
+    {
+        let mut scanning = state.scanning.lock().unwrap();
+        *scanning = false;
+    }
+
+    result.map_err(|e: anyhow::Error| format!("扫描仓库失败: {}", e))
+}
+
+#[command]
+pub async fn get_statistics(
+    app_handle: AppHandle,
+    start_date: Option<String>,
+    end_date: Option<String>,
+    author: Option<String>,
+    repository_id: Option<i64>
+) -> Result<Statistics, String> {
+    let pool = get_db_pool(&app_handle).await.map_err(|e| e.to_string())?;
+    
+    let filter = TimeFilter {
+        start_date: start_date.and_then(|s| chrono::DateTime::parse_from_rfc3339(&s).ok())
+            .map(|dt| dt.with_timezone(&chrono::Utc)),
+        end_date: end_date.and_then(|s| chrono::DateTime::parse_from_rfc3339(&s).ok())
+            .map(|dt| dt.with_timezone(&chrono::Utc)),
+        author,
+        repository_id,
+    };
+    
+    let statistics = database::get_statistics(&pool, &filter)
+        .await
+        .map_err(|e| format!("获取统计数据失败: {}", e))?;
+    
+    Ok(statistics)
+}
+
+#[command]
+pub async fn get_commit_timeline(
+    app_handle: AppHandle,
+    start_date: Option<String>,
+    end_date: Option<String>,
+    author: Option<String>,
+    repository_id: Option<i64>
+) -> Result<Vec<Commit>, String> {
+    let pool = get_db_pool(&app_handle).await.map_err(|e| e.to_string())?;
+    
+    let filter = TimeFilter {
+        start_date: start_date.and_then(|s| chrono::DateTime::parse_from_rfc3339(&s).ok())
+            .map(|dt| dt.with_timezone(&chrono::Utc)),
+        end_date: end_date.and_then(|s| chrono::DateTime::parse_from_rfc3339(&s).ok())
+            .map(|dt| dt.with_timezone(&chrono::Utc)),
+        author,
+        repository_id,
+    };
+    
+    let commits = database::get_commit_timeline(&pool, &filter)
+        .await
+        .map_err(|e| format!("获取提交时间线失败: {}", e))?;
+    
+    Ok(commits)
+}

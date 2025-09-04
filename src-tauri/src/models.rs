@@ -1,0 +1,74 @@
+use serde::{Deserialize, Serialize};
+use sqlx::FromRow;
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct Repository {
+    pub id: i64,
+    pub path: String,
+    pub name: String,
+    pub last_scanned: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct Commit {
+    pub id: String,
+    pub repository_id: i64,
+    pub repository_name: String,
+    pub author: String,
+    pub email: String,
+    pub message: String,
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+    pub additions: i32,
+    pub deletions: i32,
+    pub files_changed: i32,
+    pub branch: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct HourlyStats {
+    pub hour: i32,
+    pub additions: i32,
+    pub deletions: i32,
+    pub commits: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DailyStats {
+    pub date: String,
+    pub additions: i32,
+    pub deletions: i32,
+    pub commits: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AuthorStats {
+    pub additions: i32,
+    pub deletions: i32,
+    pub commits: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RepositoryStats {
+    pub additions: i32,
+    pub deletions: i32,
+    pub commits: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Statistics {
+    pub hourly: Vec<HourlyStats>,
+    pub daily: Vec<DailyStats>,
+    pub total_commits: i32,
+    pub total_additions: i32,
+    pub total_deletions: i32,
+    pub authors: std::collections::HashMap<String, AuthorStats>,
+    pub repositories: std::collections::HashMap<String, RepositoryStats>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TimeFilter {
+    pub start_date: Option<chrono::DateTime<chrono::Utc>>,
+    pub end_date: Option<chrono::DateTime<chrono::Utc>>,
+    pub author: Option<String>,
+    pub repository_id: Option<i64>,
+}
