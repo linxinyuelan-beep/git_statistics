@@ -24,6 +24,32 @@ pub struct Commit {
     pub branch: Option<String>,
 }
 
+// New struct for file changes
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileChange {
+    pub path: String,
+    pub additions: i32,
+    pub deletions: i32,
+    pub diff: String,
+}
+
+// New struct for commit details
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommitDetail {
+    pub id: String,
+    pub repository_id: i64,
+    pub repository_name: String,
+    pub author: String,
+    pub email: String,
+    pub message: String,
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+    pub additions: i32,
+    pub deletions: i32,
+    pub files_changed: i32,
+    pub branch: Option<String>,
+    pub file_changes: Vec<FileChange>,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct HourlyStats {
     pub hour: i32,

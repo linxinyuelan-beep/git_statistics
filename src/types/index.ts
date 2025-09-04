@@ -19,6 +19,17 @@ export interface CommitData {
   branch?: string;
 }
 
+export interface FileChange {
+  path: string;
+  additions: number;
+  deletions: number;
+  diff: string;
+}
+
+export interface CommitDetail extends CommitData {
+  file_changes: FileChange[];
+}
+
 export interface HourlyStats {
   hour: number;
   additions: number;

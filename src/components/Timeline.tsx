@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
 import { CommitData } from '../types';
+import { useNavigate } from 'react-router-dom';
 
 interface TimelineProps {
   commits: CommitData[];
 }
 
 const Timeline: React.FC<TimelineProps> = ({ commits }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedAuthor, setSelectedAuthor] = useState('');
-  const [selectedCommit, setSelectedCommit] = useState<CommitData | null>(null);
+  const navigate = useNavigate();
 
   if (!commits || commits.length === 0) {
     return (
@@ -20,6 +19,9 @@ const Timeline: React.FC<TimelineProps> = ({ commits }) => {
   }
 
   const authors = Array.from(new Set(commits.map(c => c.author))).sort();
+  
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedAuthor, setSelectedAuthor] = useState('');
   
   const filteredCommits = commits.filter(commit => {
     const matchesSearch = !searchTerm || 
@@ -42,11 +44,8 @@ const Timeline: React.FC<TimelineProps> = ({ commits }) => {
   };
 
   const handleCommitClick = (commit: CommitData) => {
-    setSelectedCommit(commit);
-  };
-
-  const closeCommitDetail = () => {
-    setSelectedCommit(null);
+    // Navigate to commit detail page
+    navigate(`/commit/${commit.repository_id}/${commit.id}`);
   };
 
   return (
@@ -128,77 +127,6 @@ const Timeline: React.FC<TimelineProps> = ({ commits }) => {
           </div>
         ))}
       </div>
-
-      {/* Commit Detail Modal */}
-      {selectedCommit && (
-        <div className="modal-overlay" onClick={closeCommitDetail}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>提交详情</h2>
-              <button className="modal-close" onClick={closeCommitDetail}>×</button>
-            </div>
-            <div className="modal-body">
-              <div className="commit-detail-info">
-                <div className="detail-row">
-                  <span className="detail-label">作者:</span>
-                  <span className="detail-value">{selectedCommit.author}</span>
-                </div>
-                <div className="detail-row">
-                  <span className="detail-label">邮箱:</span>
-                  <span className="detail-value">{selectedCommit.email}</span>
-                </div>
-                <div className="detail-row">
-                  <span className="detail-label">时间:</span>
-                  <span className="detail-value">{formatDate(selectedCommit.timestamp)}</span>
-                </div>
-                <div className="detail-row">
-                  <span className="detail-label">仓库:</span>
-                  <span className="detail-value">{selectedCommit.repository_name}</span>
-                </div>
-                {selectedCommit.branch && (
-                  <div className="detail-row">
-                    <span className="detail-label">分支:</span>
-                    <span className="detail-value">{selectedCommit.branch}</span>
-                  </div>
-                )}
-                <div className="detail-row">
-                  <span className="detail-label">提交ID:</span>
-                  <span className="detail-value commit-id">{selectedCommit.id}</span>
-                </div>
-              </div>
-              
-              <div className="commit-detail-message">
-                <h3>提交信息</h3>
-                <pre>{selectedCommit.message}</pre>
-              </div>
-              
-              <div className="commit-detail-stats">
-                <h3>变更统计</h3>
-                <div className="stats-grid">
-                  <div className="stat-card">
-                    <div className="stat-number text-green">+{selectedCommit.additions}</div>
-                    <div className="stat-label">新增行数</div>
-                  </div>
-                  <div className="stat-card">
-                    <div className="stat-number text-red">-{selectedCommit.deletions}</div>
-                    <div className="stat-label">删除行数</div>
-                  </div>
-                  <div className="stat-card">
-                    <div className="stat-number">{selectedCommit.files_changed}</div>
-                    <div className="stat-label">文件变更</div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* TODO: Add file changes and diff viewer here */}
-              <div className="commit-detail-files">
-                <h3>文件变更</h3>
-                <p>文件变更详情和代码差异查看功能将在后续版本中实现。</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

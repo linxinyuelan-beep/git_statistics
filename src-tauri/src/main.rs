@@ -30,7 +30,8 @@ fn main() {
             get_repositories,
             scan_repository,
             get_statistics,
-            get_commit_timeline
+            get_commit_timeline,
+            get_commit_detail
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

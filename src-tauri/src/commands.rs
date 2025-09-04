@@ -1,7 +1,7 @@
 use tauri::{command, AppHandle, State};
 use crate::database::{self, get_db_pool};
-use crate::git_analyzer::analyze_repository;
-use crate::models::{Repository, Commit, Statistics, TimeFilter};
+use crate::git_analyzer::{analyze_repository, GitAnalyzer};
+use crate::models::{Repository, Commit, CommitDetail, Statistics, TimeFilter};
 use anyhow::Result;
 use std::sync::Mutex;
 
@@ -168,4 +168,32 @@ pub async fn get_commit_timeline(
         .map_err(|e| format!("获取提交时间线失败: {}", e))?;
     
     Ok(commits)
+}
+
+#[command]
+pub async fn get_commit_detail(
+    app_handle: AppHandle,
+    repository_id: i64,
+    commit_id: String
+) -> Result<CommitDetail, String> {
+    let pool = get_db_pool(&app_handle).await.map_err(|e| e.to_string())?;
+    
+    // Get repository info
+    let repositories = database::get_repositories(&pool)
+        .await
+        .map_err(|e| format!("获取仓库信息失败: {}", e))?;
+        
+    let repository = repositories
+        .into_iter()
+        .find(|r| r.id == repository_id)
+        .ok_or_else(|| "仓库未找到".to_string())?;
+    
+    // Create GitAnalyzer and get commit detail
+    let analyzer = GitAnalyzer::new(repository)
+        .map_err(|e| format!("无法打开仓库: {}", e))?;
+        
+    let commit_detail = analyzer.get_commit_detail(&commit_id)
+        .map_err(|e| format!("获取提交详情失败: {}", e))?;
+    
+    Ok(commit_detail)
 }

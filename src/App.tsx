@@ -22,7 +22,7 @@ function App() {
     if (repositories.length > 0) {
       loadData();
     }
-  }, [filter]);
+  }, [filter, repositories.length]);
 
   const loadData = async () => {
     try {

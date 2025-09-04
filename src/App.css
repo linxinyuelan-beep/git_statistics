@@ -562,6 +562,68 @@ body {
   font-style: italic;
 }
 
+/* File Changes Styles */
+.file-changes-list {
+  border: 1px solid #eee;
+  border-radius: 4px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.file-change-item {
+  border-bottom: 1px solid #eee;
+  padding: 1rem;
+}
+
+.file-change-item:last-child {
+  border-bottom: none;
+}
+
+.file-change-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.file-path {
+  font-family: monospace;
+  font-weight: 500;
+  color: #333;
+}
+
+.file-stats {
+  display: flex;
+  gap: 1rem;
+}
+
+.stat-additions {
+  color: #28a745;
+  font-weight: 500;
+}
+
+.stat-deletions {
+  color: #dc3545;
+  font-weight: 500;
+}
+
+.file-diff {
+  background: #f8f9fa;
+  border-radius: 4px;
+  padding: 0.75rem;
+  overflow-x: auto;
+}
+
+.file-diff pre {
+  margin: 0;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  white-space: pre;
+}
+
 @media (max-width: 768px) {
   .app-content {
     flex-direction: column;
@@ -585,4 +647,229 @@ body {
     flex-wrap: wrap;
     gap: 1rem;
   }
+}
+
+/* Commit Detail Page Styles */
+.commit-detail-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #f9f9f9;
+}
+
+.page-header {
+  background: white;
+  padding: 1rem 2rem;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.back-button {
+  background: #f8f9fa;
+  color: #495057;
+  border: 1px solid #dee2e6;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.back-button:hover {
+  background: #e9ecef;
+  border-color: #adb5bd;
+}
+
+.page-header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.page-content {
+  flex: 1;
+  padding: 2rem;
+  overflow-y: auto;
+}
+
+.commit-detail-page .commit-detail-info {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  margin-bottom: 2rem;
+}
+
+.commit-detail-page .detail-row {
+  display: flex;
+  margin-bottom: 0.75rem;
+}
+
+.commit-detail-page .detail-label {
+  font-weight: 600;
+  width: 100px;
+  color: #666;
+}
+
+.commit-detail-page .detail-value {
+  flex: 1;
+  color: #333;
+}
+
+.commit-detail-page .commit-id {
+  font-family: monospace;
+  font-size: 0.9rem;
+}
+
+.commit-detail-page .commit-detail-message {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  margin-bottom: 2rem;
+}
+
+.commit-detail-page .commit-detail-message h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: #333;
+}
+
+.commit-detail-page .commit-detail-message pre {
+  background: #f8f9fa;
+  padding: 1rem;
+  border-radius: 4px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  margin: 0;
+}
+
+.commit-detail-page .commit-detail-stats {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  margin-bottom: 2rem;
+}
+
+.commit-detail-page .commit-detail-stats h3 {
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+  color: #333;
+}
+
+.commit-detail-page .stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1.5rem;
+}
+
+.commit-detail-page .stat-card {
+  text-align: center;
+  padding: 1.5rem;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  background: #f8f9fa;
+}
+
+.commit-detail-page .stat-number {
+  font-size: 2rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.commit-detail-page .stat-label {
+  color: #666;
+  font-size: 1rem;
+}
+
+.commit-detail-page .commit-detail-files {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.commit-detail-page .commit-detail-files h3 {
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+  color: #333;
+}
+
+.commit-detail-page .file-changes-list {
+  border: 1px solid #eee;
+  border-radius: 4px;
+  max-height: none;
+}
+
+.commit-detail-page .file-change-item {
+  border-bottom: 1px solid #eee;
+  padding: 1.5rem;
+}
+
+.commit-detail-page .file-change-item:last-child {
+  border-bottom: none;
+}
+
+.commit-detail-page .file-change-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.commit-detail-page .file-path {
+  font-family: monospace;
+  font-weight: 600;
+  color: #333;
+}
+
+.commit-detail-page .file-stats {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.commit-detail-page .stat-additions {
+  color: #28a745;
+  font-weight: 600;
+}
+
+.commit-detail-page .stat-deletions {
+  color: #dc3545;
+  font-weight: 600;
+}
+
+.commit-detail-page .file-diff {
+  background: #f8f9fa;
+  border-radius: 4px;
+  padding: 0;
+  overflow-x: auto;
+}
+
+.commit-detail-page .file-diff pre {
+  margin: 0;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  white-space: pre;
+}
+
+.commit-detail-page .loading,
+.commit-detail-page .error {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  color: #666;
+  font-size: 1.1rem;
+}
+
+.commit-detail-page .error {
+  color: #dc3545;
 }
