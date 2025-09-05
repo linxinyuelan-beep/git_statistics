@@ -1,8 +1,8 @@
-# Git 工作量统计桌面应用 - 项目上下文 (QWEN.md)
+# Git Commit 统计桌面应用 - 项目上下文 (QWEN.md)
 
 ## 项目概览
 
-这是一个名为 "Git 工作量统计" 的桌面应用程序。其主要目的是分析本地 Git 仓库的提交历史，统计代码的增删行数，并以图表和时间线的形式可视化这些数据。该应用旨在帮助开发者和团队了解代码贡献情况。
+这是一个名为 "Git Commit 统计" 的桌面应用程序。其主要目的是分析本地 Git 仓库的提交历史，统计代码的增删行数，并以图表和时间线的形式可视化这些数据。该应用旨在帮助开发者和团队了解代码贡献情况。
 
 **核心技术栈:**
 *   **前端框架:** React (使用 TypeScript)
@@ -72,7 +72,9 @@ git_statistics/
 ### Git 数据分析
 *   后端使用 `git2-rs` 库分析指定仓库的 Git 提交历史。
 *   提取每次提交的作者、时间、新增行数、删除行数等信息。
-*   为避免重复分析，系统会记录每个仓库的上次扫描时间，并只分析新增的提交。
+*   支持两种分析模式：
+    *   增量分析：只分析自上次扫描以来的新提交
+    *   全量分析：分析仓库中的所有提交
 
 ### 数据存储与缓存
 *   所有分析得到的提交数据存储在本地 SQLite 数据库中。
@@ -97,6 +99,11 @@ git_statistics/
     *   仓库 (只分析特定仓库)
     *   提供了快速筛选按钮 (如过去7天、过去30天)。
 
+### 进度显示
+*   在数据刷新过程中，会显示实时进度条
+*   进度条显示当前处理的仓库和整体进度百分比
+*   对于长时间运行的操作，使用假进度条技术改善用户体验
+
 ## 关键 API 接口 (Tauri Commands)
 
 前端通过 `invoke` 调用以下后端命令：
@@ -104,7 +111,8 @@ git_statistics/
 *   `add_repository(path: string)`: 添加一个新的 Git 仓库。
 *   `remove_repository(id: number)`: 根据 ID 删除一个仓库。
 *   `get_repositories()`: 获取所有已添加仓库的列表。
-*   `scan_repository(repository_id: number)`: 分析指定仓库的 Git 历史并更新数据库。
+*   `scan_repository(repository_id: number)`: 增量分析指定仓库的 Git 历史并更新数据库。
+*   `force_scan_repository(repository_id: number)`: 全量分析指定仓库的 Git 历史并更新数据库。
 *   `get_statistics(filters)`: 根据筛选条件获取聚合统计数据。
 *   `get_commit_timeline(filters)`: 根据筛选条件获取详细的提交时间线数据。
 

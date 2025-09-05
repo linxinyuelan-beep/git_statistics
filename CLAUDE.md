@@ -35,8 +35,8 @@ This is a **Tauri desktop application** for Git repository statistics analysis w
 - `src-tauri/src/models.rs` - Rust data structures
 
 **Key Dependencies**:
-- Frontend: React, TypeScript, ECharts, dayjs
-- Backend: Tauri, git2, sqlx (SQLite), chrono, tokio
+- Frontend: React, TypeScript, ECharts, dayjs, react-router-dom, react-syntax-highlighter
+- Backend: Tauri, git2, sqlx (SQLite), chrono, tokio, anyhow
 
 ## Tauri Commands (Frontend-Backend Interface)
 
@@ -45,8 +45,10 @@ The app exposes these Rust functions to the frontend via Tauri:
 - `remove_repository(id: number)` - Remove repository
 - `get_repositories()` - List all repositories
 - `scan_repository(repository_id: number)` - Analyze repository commits
+- `force_scan_repository(repository_id: number)` - Force re-scan repository (ignores cache)
 - `get_statistics(filters)` - Get aggregated statistics
 - `get_commit_timeline(filters)` - Get commit timeline data
+- `get_commit_detail(commit_hash: string)` - Get detailed commit information
 
 ## Data Flow
 
@@ -66,7 +68,10 @@ Uses SQLite with tables for:
 ## Development Notes
 
 - Tauri configuration in `src-tauri/tauri.conf.json`
-- App runs on localhost:1420 in development
+- App runs on localhost:1420 in development (configured in vite.config.ts)
 - Desktop app with window size 1200x800 (min 800x600)
-- File system access enabled for repository selection
+- File system access enabled for repository selection (`dialog-open`, `fs-all` features)
 - No remote repository support (local only)
+- SQLite database stored as `identifier.sqlite` in project root
+- Async state management with `AppState` struct to track scanning operations
+- TypeScript strict mode enabled with comprehensive type checking

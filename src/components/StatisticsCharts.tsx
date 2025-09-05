@@ -1,7 +1,6 @@
 import React from 'react';
 import ReactECharts from 'echarts-for-react';
 import { Statistics, TimeFilter } from '../types';
-import * as echarts from 'echarts';
 
 interface StatisticsChartsProps {
   statistics: Statistics | null;

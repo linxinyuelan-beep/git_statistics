@@ -1,18 +1,40 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 import { open } from '@tauri-apps/api/dialog';
+import { useLocation } from 'react-router-dom';
 import RepositoryManager from './components/RepositoryManager';
 import StatisticsCharts from './components/StatisticsCharts';
 import Timeline from './components/Timeline';
 import { Repository, CommitData, Statistics, TimeFilter } from './types';
 
 function App() {
+  const location = useLocation();
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [statistics, setStatistics] = useState<Statistics | null>(null);
   const [timeline, setTimeline] = useState<CommitData[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'charts' | 'timeline'>('charts');
+  const [loadingProgress, setLoadingProgress] = useState<{current: number, total: number, message: string} | null>(null);
+  const [activeTab, setActiveTab] = useState<'charts' | 'timeline'>(() => {
+    const savedTab = localStorage.getItem('activeTab');
+    return savedTab === 'timeline' ? 'timeline' : 'charts';
+  });
   const [filter, setFilter] = useState<TimeFilter>({});
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    const saved = localStorage.getItem('sidebarCollapsed');
+    return saved === 'true';
+  });
+
+  // 当从提交详情页面返回时，自动切换到时间线标签页
+  useEffect(() => {
+    const isReturningFromCommitDetail = sessionStorage.getItem('returning-from-commit-detail') === 'true';
+    if (isReturningFromCommitDetail) {
+      console.log('从提交详情页面返回，切换到时间线标签页');
+      setActiveTab('timeline');
+      localStorage.setItem('activeTab', 'timeline');
+      // 清除标记，避免重复触发
+      sessionStorage.removeItem('returning-from-commit-detail');
+    }
+  }, [location.pathname]); // 改为监听路径变化
 
   useEffect(() => {
     loadRepositories();
@@ -91,11 +113,45 @@ function App() {
 
   const handleRefreshData = async () => {
     setLoading(true);
+    setLoadingProgress({ current: 0, total: repositories.length, message: '开始刷新...' });
+    
     try {
-      // Scan all repositories
-      for (const repo of repositories) {
-        await invoke('scan_repository', { repositoryId: repo.id });
+      // Scan all repositories (incremental)
+      for (let i = 0; i < repositories.length; i++) {
+        const repo = repositories[i];
+        // Update progress
+        setLoadingProgress({ 
+          current: i, 
+          total: repositories.length, 
+          message: `正在刷新仓库: ${repo.name} (${i+1}/${repositories.length})` 
+        });
+        
+        // For long-running repository scans, show fake progress
+        let fakeProgressCurrent = 0;
+        const fakeProgressTotal = 100;
+        const fakeProgressInterval = setInterval(() => {
+          if (fakeProgressCurrent < fakeProgressTotal - 1) {
+            fakeProgressCurrent += 1;
+            setLoadingProgress({ 
+              current: i + (fakeProgressCurrent / fakeProgressTotal), 
+              total: repositories.length, 
+              message: `正在刷新仓库: ${repo.name} - ${fakeProgressCurrent}%` 
+            });
+          }
+        }, 50);
+        
+        try {
+          await invoke('scan_repository', { repositoryId: repo.id });
+        } finally {
+          clearInterval(fakeProgressInterval);
+        }
       }
+      
+      setLoadingProgress({ 
+        current: repositories.length, 
+        total: repositories.length, 
+        message: '刷新完成，正在加载数据...' 
+      });
       
       // Reload data with current filters
       await loadData();
@@ -103,6 +159,59 @@ function App() {
       console.error('Failed to refresh data:', error);
     } finally {
       setLoading(false);
+      setLoadingProgress(null);
+    }
+  };
+
+  const handleForceRefreshData = async () => {
+    setLoading(true);
+    setLoadingProgress({ current: 0, total: repositories.length, message: '开始全量刷新...' });
+    
+    try {
+      // Force scan all repositories (full scan)
+      for (let i = 0; i < repositories.length; i++) {
+        const repo = repositories[i];
+        // Update progress
+        setLoadingProgress({ 
+          current: i, 
+          total: repositories.length, 
+          message: `正在刷新仓库: ${repo.name} (${i+1}/${repositories.length})` 
+        });
+        
+        // For long-running repository scans, show fake progress
+        let fakeProgressCurrent = 0;
+        const fakeProgressTotal = 100;
+        const fakeProgressInterval = setInterval(() => {
+          if (fakeProgressCurrent < fakeProgressTotal - 1) {
+            fakeProgressCurrent += 1;
+            setLoadingProgress({ 
+              current: i + (fakeProgressCurrent / fakeProgressTotal), 
+              total: repositories.length, 
+              message: `正在刷新仓库: ${repo.name} - ${fakeProgressCurrent}%` 
+            });
+          }
+        }, 50);
+        
+        try {
+          await invoke('force_scan_repository', { repositoryId: repo.id });
+        } finally {
+          clearInterval(fakeProgressInterval);
+        }
+      }
+      
+      setLoadingProgress({ 
+        current: repositories.length, 
+        total: repositories.length, 
+        message: '刷新完成，正在加载数据...' 
+      });
+      
+      // Reload data with current filters
+      await loadData();
+    } catch (error) {
+      console.error('Failed to force refresh data:', error);
+    } finally {
+      setLoading(false);
+      setLoadingProgress(null);
     }
   };
 
@@ -110,13 +219,28 @@ function App() {
     <div className="app">
       <header className="app-header">
         <div className="header-top">
-          <h1>Git 工作量统计</h1>
+          <h1>Git Commit 统计</h1>
           <div className="header-actions">
             <button onClick={handleRefreshData} disabled={loading}>
               {loading ? '分析中...' : '刷新数据'}
             </button>
+            <button onClick={handleForceRefreshData} disabled={loading}>
+              {loading ? '分析中...' : '全量刷新'}
+            </button>
           </div>
         </div>
+        {loadingProgress && (
+          <div className="progress-container">
+            <div className="progress-info">{loadingProgress.message}</div>
+            <div className="progress-bar">
+              <div 
+                className="progress-fill" 
+                style={{ width: `${(loadingProgress.current / loadingProgress.total) * 100}%` }}
+              ></div>
+            </div>
+            <div className="progress-text">{loadingProgress.current}/{loadingProgress.total}</div>
+          </div>
+        )}
         <div className="filter-section">
           <div className="filter-group">
             <label>开始日期:</label>
@@ -173,25 +297,44 @@ function App() {
       </header>
 
       <div className="app-content">
-        <aside className="sidebar">
-          <RepositoryManager
-            repositories={repositories}
-            onAdd={handleAddRepository}
-            onRemove={handleRemoveRepository}
-          />
+        <aside className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
+          {!sidebarCollapsed && (
+            <RepositoryManager
+              repositories={repositories}
+              onAdd={handleAddRepository}
+              onRemove={handleRemoveRepository}
+            />
+          )}
+          <button 
+            className="sidebar-toggle" 
+            onClick={() => {
+              const newState = !sidebarCollapsed;
+              setSidebarCollapsed(newState);
+              localStorage.setItem('sidebarCollapsed', newState.toString());
+            }}
+            title={sidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'}
+          >
+            {sidebarCollapsed ? '▶' : '◀'}
+          </button>
         </aside>
 
         <main className="main-content">
           <div className="tabs">
             <button 
               className={activeTab === 'charts' ? 'active' : ''}
-              onClick={() => setActiveTab('charts')}
+              onClick={() => {
+                setActiveTab('charts');
+                localStorage.setItem('activeTab', 'charts');
+              }}
             >
               统计图表
             </button>
             <button 
               className={activeTab === 'timeline' ? 'active' : ''}
-              onClick={() => setActiveTab('timeline')}
+              onClick={() => {
+                setActiveTab('timeline');
+                localStorage.setItem('activeTab', 'timeline');
+              }}
             >
               提交时间线
             </button>

@@ -29,6 +29,7 @@ fn main() {
             remove_repository,
             get_repositories,
             scan_repository,
+            force_scan_repository,
             get_statistics,
             get_commit_timeline,
             get_commit_detail

@@ -67,6 +67,24 @@ pub async fn scan_repository(
     repository_id: i64,
     state: State<'_, AppState>
 ) -> Result<i32, String> {
+    scan_repository_internal(app_handle, repository_id, state, true).await
+}
+
+#[command]
+pub async fn force_scan_repository(
+    app_handle: AppHandle, 
+    repository_id: i64,
+    state: State<'_, AppState>
+) -> Result<i32, String> {
+    scan_repository_internal(app_handle, repository_id, state, false).await
+}
+
+async fn scan_repository_internal(
+    app_handle: AppHandle, 
+    repository_id: i64,
+    state: State<'_, AppState>,
+    use_incremental: bool
+) -> Result<i32, String> {
     // Check if already scanning
     {
         let scanning = state.scanning.lock().unwrap();
@@ -91,8 +109,14 @@ pub async fn scan_repository(
             .find(|r| r.id == repository_id)
             .ok_or_else(|| anyhow::anyhow!("Repository not found"))?;
         
-        // Determine since when to analyze (only new commits since last scan)
-        let since = repository.last_scanned;
+        // Determine since when to analyze
+        // For incremental scan, only analyze new commits since last scan
+        // For force scan, analyze all commits (since = None)
+        let since = if use_incremental {
+            repository.last_scanned
+        } else {
+            None
+        };
         
         // Analyze commits
         let commits = analyze_repository(repository.clone(), since)?;
@@ -103,8 +127,10 @@ pub async fn scan_repository(
             database::save_commits(&pool, &commits).await?;
         }
         
-        // Update last scanned time
-        database::update_repository_scan_time(&pool, repository_id).await?;
+        // Update last scanned time (only for incremental scan)
+        if use_incremental {
+            database::update_repository_scan_time(&pool, repository_id).await?;
+        }
         
         Ok(commit_count)
     }.await;

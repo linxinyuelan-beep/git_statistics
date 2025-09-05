@@ -95,7 +95,11 @@ const CommitDetailPage: React.FC = () => {
     return (
       <div className="commit-detail-page">
         <div className="page-header">
-          <button className="back-button" onClick={() => navigate(-1)}>← 返回</button>
+          <button className="back-button" onClick={() => {
+            // 设置返回标记
+            sessionStorage.setItem('returning-from-commit-detail', 'true');
+            navigate('/');
+          }}>← 返回</button>
           <h1>提交详情</h1>
         </div>
         <div className="page-content">
@@ -109,7 +113,11 @@ const CommitDetailPage: React.FC = () => {
     return (
       <div className="commit-detail-page">
         <div className="page-header">
-          <button className="back-button" onClick={() => navigate(-1)}>← 返回</button>
+          <button className="back-button" onClick={() => {
+            // 设置返回标记
+            sessionStorage.setItem('returning-from-commit-detail', 'true');
+            navigate('/');
+          }}>← 返回</button>
           <h1>提交详情</h1>
         </div>
         <div className="page-content">
