@@ -49,7 +49,23 @@ pub async fn init_database(app_handle: &AppHandle) -> Result<SqlitePool> {
             PRIMARY KEY (id, repository_id),
             FOREIGN KEY (repository_id) REFERENCES repositories (id) ON DELETE CASCADE
         )
-        "#,
+        "#
+    )
+    .execute(&pool)
+    .await?;
+
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS file_changes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            commit_id TEXT NOT NULL,
+            repository_id INTEGER NOT NULL,
+            file_path TEXT NOT NULL,
+            additions INTEGER NOT NULL DEFAULT 0,
+            deletions INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (commit_id, repository_id) REFERENCES commits (id, repository_id) ON DELETE CASCADE
+        )
+        "#
     )
     .execute(&pool)
     .await?;
@@ -64,6 +80,14 @@ pub async fn init_database(app_handle: &AppHandle) -> Result<SqlitePool> {
         .await?;
     
     sqlx::query("CREATE INDEX IF NOT EXISTS idx_commits_repository ON commits(repository_id)")
+        .execute(&pool)
+        .await?;
+
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_file_changes_path ON file_changes(file_path)")
+        .execute(&pool)
+        .await?;
+    
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_file_changes_commit ON file_changes(commit_id)")
         .execute(&pool)
         .await?;
 
@@ -155,6 +179,30 @@ pub async fn save_commits(pool: &SqlitePool, commits: &[Commit]) -> Result<()> {
         .bind(commit.deletions)
         .bind(commit.files_changed)
         .bind(&commit.branch)
+        .execute(&mut *tx)
+        .await?;
+    }
+    
+    tx.commit().await?;
+    Ok(())
+}
+
+pub async fn save_file_changes(pool: &SqlitePool, commit_id: &str, repository_id: i64, file_changes: &[crate::git_analyzer::FileChange]) -> Result<()> {
+    let mut tx = pool.begin().await?;
+    
+    for file_change in file_changes {
+        sqlx::query(
+            r#"
+            INSERT OR REPLACE INTO file_changes 
+            (commit_id, repository_id, file_path, additions, deletions)
+            VALUES (?, ?, ?, ?, ?)
+            "#
+        )
+        .bind(commit_id)
+        .bind(repository_id)
+        .bind(&file_change.path)
+        .bind(file_change.additions)
+        .bind(file_change.deletions)
         .execute(&mut *tx)
         .await?;
     }
@@ -448,6 +496,184 @@ pub async fn get_statistics(pool: &SqlitePool, filter: &TimeFilter) -> Result<St
         })
         .collect();
 
+    // Get commit size distribution
+    let size_dist_query = format!(
+        "SELECT 
+         CASE 
+           WHEN (additions + deletions) <= 10 THEN 'small'
+           WHEN (additions + deletions) <= 100 THEN 'medium'
+           WHEN (additions + deletions) <= 500 THEN 'large'
+           ELSE 'huge'
+         END as size_range,
+         COUNT(*) as count
+         {} GROUP BY size_range ORDER BY 
+         CASE size_range 
+           WHEN 'small' THEN 1
+           WHEN 'medium' THEN 2
+           WHEN 'large' THEN 3
+           WHEN 'huge' THEN 4
+         END",
+        base_query
+    );
+    
+    let mut query_builder = sqlx::query(&size_dist_query);
+    for param in &params {
+        query_builder = query_builder.bind(param);
+    }
+    
+    let size_dist_rows = query_builder.fetch_all(pool).await?;
+    let commit_size_distribution: Vec<CommitSizeDistribution> = size_dist_rows
+        .into_iter()
+        .map(|row| {
+            let size_range: String = row.get("size_range");
+            let (min_lines, max_lines) = match size_range.as_str() {
+                "small" => (0, 10),
+                "medium" => (11, 100),
+                "large" => (101, 500),
+                "huge" => (501, i32::MAX),
+                _ => (0, 0),
+            };
+            CommitSizeDistribution {
+                size_range,
+                count: row.get("count"),
+                min_lines,
+                max_lines,
+            }
+        })
+        .collect();
+
+    // Get efficiency trends (additions / (additions + deletions))
+    let efficiency_query = format!(
+        "SELECT DATE(timestamp) as date,
+         SUM(additions) as total_additions,
+         SUM(deletions) as total_deletions,
+         (SUM(additions) + SUM(deletions)) as total_changes
+         {} GROUP BY date ORDER BY date",
+        base_query
+    );
+    
+    let mut query_builder = sqlx::query(&efficiency_query);
+    for param in &params {
+        query_builder = query_builder.bind(param);
+    }
+    
+    let efficiency_rows = query_builder.fetch_all(pool).await?;
+    let efficiency_trends: Vec<EfficiencyTrend> = efficiency_rows
+        .into_iter()
+        .map(|row| {
+            let additions: i32 = row.get("total_additions");
+            let deletions: i32 = row.get("total_deletions");
+            let total = additions + deletions;
+            let efficiency_ratio = if total > 0 {
+                additions as f64 / total as f64
+            } else {
+                0.5
+            };
+            EfficiencyTrend {
+                date: row.get("date"),
+                efficiency_ratio,
+                total_changes: row.get("total_changes"),
+            }
+        })
+        .collect();
+
+    // Get hot files (most frequently changed files)
+    // We now have actual file-level data stored in the database
+    let hot_files_query = format!(
+        "SELECT fc.file_path,
+         COUNT(*) as change_count,
+         SUM(fc.additions) as total_additions,
+         SUM(fc.deletions) as total_deletions,
+         MAX(c.timestamp) as last_modified
+         FROM file_changes fc
+         JOIN commits c ON fc.commit_id = c.id AND fc.repository_id = c.repository_id
+         WHERE 1=1 {}
+         GROUP BY fc.file_path 
+         ORDER BY change_count DESC 
+         LIMIT 20",
+        {
+            let mut conditions = String::new();
+            if let Some(start_date) = &filter.start_date {
+                conditions.push_str(" AND c.timestamp >= ?");
+            }
+            if let Some(end_date) = &filter.end_date {
+                conditions.push_str(" AND c.timestamp <= ?");
+            }
+            if let Some(author) = &filter.author {
+                conditions.push_str(" AND c.author = ?");
+            }
+            if let Some(repository_id) = filter.repository_id {
+                conditions.push_str(" AND c.repository_id = ?");
+            }
+            conditions
+        }
+    );
+    
+    let mut query_builder = sqlx::query(&hot_files_query);
+    // Bind parameters for the file changes query
+    for param in &params {
+        query_builder = query_builder.bind(param);
+    }
+    
+    let hot_files_rows = query_builder.fetch_all(pool).await?;
+    let hot_files: Vec<HotFile> = hot_files_rows
+        .into_iter()
+        .map(|row| HotFile {
+            file_path: row.get("file_path"),
+            change_count: row.get("change_count"),
+            total_additions: row.get("total_additions"),
+            total_deletions: row.get("total_deletions"),
+            last_modified: row.get::<chrono::DateTime<chrono::Utc>, _>("last_modified").to_rfc3339(),
+        })
+        .collect();
+
+    // Get commit message words (basic word frequency analysis)
+    let message_query = format!(
+        "SELECT message {} ORDER BY timestamp DESC LIMIT 1000",
+        base_query
+    );
+    
+    let mut query_builder = sqlx::query(&message_query);
+    for param in &params {
+        query_builder = query_builder.bind(param);
+    }
+    
+    let message_rows = query_builder.fetch_all(pool).await?;
+    let mut word_counts = std::collections::HashMap::new();
+    
+    // Process commit messages to extract words
+    for row in message_rows {
+        let message: String = row.get("message");
+        let words: Vec<&str> = message
+            .split_whitespace()
+            .filter(|word| word.len() > 2 && !word.starts_with('#'))
+            .map(|word| word.trim_matches(|c: char| !c.is_alphanumeric()))
+            .filter(|word| word.len() > 2)
+            .collect();
+        
+        for word in words {
+            let word = word.to_lowercase();
+            // Skip common words
+            if !matches!(word.as_str(), "the" | "and" | "for" | "are" | "but" | "not" | "you" | "all" | "can" | "her" | "was" | "one" | "our" | "out" | "day" | "get" | "use" | "man" | "new" | "now" | "way" | "may" | "say" | "each" | "which" | "their" | "time" | "will" | "about" | "if" | "up" | "out" | "many" | "then" | "them" | "these" | "so" | "some" | "her" | "would" | "make" | "like" | "into" | "him" | "has" | "two" | "more" | "very" | "what" | "know" | "just" | "first" | "could" | "any" | "my" | "than" | "much" | "your" | "how" | "said" | "each" | "she" | "which" | "their" | "his" | "been" | "have" | "there" | "we" | "what" | "were" | "they" | "who" | "oil" | "its" | "now" | "find" | "long" | "down" | "day" | "did" | "get" | "come" | "made" | "may" | "part") {
+                *word_counts.entry(word).or_insert(0) += 1;
+            }
+        }
+    }
+    
+    // Convert to sorted list
+    let mut commit_message_words: Vec<CommitMessageWord> = word_counts
+        .into_iter()
+        .filter(|(_, count)| *count >= 2) // Only include words that appear at least twice
+        .map(|(word, count)| CommitMessageWord {
+            word,
+            count,
+            weight: (count as f64).log2() + 1.0, // Log scale for better visualization
+        })
+        .collect();
+    
+    commit_message_words.sort_by(|a, b| b.count.cmp(&a.count));
+    commit_message_words.truncate(50); // Limit to top 50 words
+
     Ok(Statistics {
         hourly,
         daily,
@@ -460,5 +686,9 @@ pub async fn get_statistics(pool: &SqlitePool, filter: &TimeFilter) -> Result<St
         hourly_commit_distribution,
         author_activity_trends,
         commit_frequency_distribution,
+        commit_size_distribution,
+        efficiency_trends,
+        hot_files,
+        commit_message_words,
     })
 }

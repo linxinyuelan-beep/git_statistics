@@ -30,7 +30,13 @@ function App() {
         return {};
       }
     }
-    return {};
+    
+    // 默认设置为最近30天
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    return {
+      start_date: thirtyDaysAgo.toISOString().split('T')[0]
+    };
   });
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
     const saved = localStorage.getItem('sidebarCollapsed');
@@ -176,57 +182,7 @@ function App() {
     }
   };
 
-  const handleRefreshData = async () => {
-    setLoading(true);
-    setLoadingProgress({ current: 0, total: repositories.length, message: '开始刷新...' });
-    
-    try {
-      // Scan all repositories (incremental)
-      for (let i = 0; i < repositories.length; i++) {
-        const repo = repositories[i];
-        // Update progress
-        setLoadingProgress({ 
-          current: i, 
-          total: repositories.length, 
-          message: `正在刷新仓库: ${repo.name} (${i+1}/${repositories.length})` 
-        });
-        
-        // For long-running repository scans, show fake progress
-        let fakeProgressCurrent = 0;
-        const fakeProgressTotal = 100;
-        const fakeProgressInterval = setInterval(() => {
-          if (fakeProgressCurrent < fakeProgressTotal - 1) {
-            fakeProgressCurrent += 1;
-            setLoadingProgress({ 
-              current: i + (fakeProgressCurrent / fakeProgressTotal), 
-              total: repositories.length, 
-              message: `正在刷新仓库: ${repo.name} - ${fakeProgressCurrent}%` 
-            });
-          }
-        }, 50);
-        
-        try {
-          await invoke('scan_repository', { repositoryId: repo.id });
-        } finally {
-          clearInterval(fakeProgressInterval);
-        }
-      }
-      
-      setLoadingProgress({ 
-        current: repositories.length, 
-        total: repositories.length, 
-        message: '刷新完成，正在加载数据...' 
-      });
-      
-      // Reload data with current filters
-      await loadData();
-    } catch (error) {
-      console.error('Failed to refresh data:', error);
-    } finally {
-      setLoading(false);
-      setLoadingProgress(null);
-    }
-  };
+  
 
   const handleForceRefreshData = async () => {
     setLoading(true);
@@ -338,9 +294,6 @@ function App() {
         <div className="header-top">
           <h1>Commit 统计</h1>
           <div className="header-actions">
-            <button onClick={handleRefreshData} disabled={loading}>
-              {loading ? '分析中...' : '增量刷新'}
-            </button>
             <button onClick={handleRefreshLast24Hours} disabled={loading}>
               {loading ? '分析中...' : '刷新一天'}
             </button>
@@ -403,19 +356,32 @@ function App() {
             </select>
           </div>
           <div className="quick-filters">
-            <button onClick={() => setFilter({ 
+            <button onClick={() => setFilter(prev => ({ 
+              ...prev,
               start_date: new Date().toISOString().split('T')[0],
               end_date: new Date().toISOString().split('T')[0]
-            })}>
+            }))}>
               今日
             </button>
-            <button onClick={() => setFilter({ start_date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0] })}>
+            <button onClick={() => setFilter(prev => ({ 
+              ...prev,
+              start_date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              end_date: undefined
+            }))}>
               昨天
             </button>
-            <button onClick={() => setFilter({ start_date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] })}>
+            <button onClick={() => setFilter(prev => ({ 
+              ...prev,
+              start_date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              end_date: undefined
+            }))}>
               过去7天
             </button>
-            <button onClick={() => setFilter({ start_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] })}>
+            <button onClick={() => setFilter(prev => ({ 
+              ...prev,
+              start_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              end_date: undefined
+            }))}>
               过去30天
             </button>
             <button onClick={() => setFilter({})}>

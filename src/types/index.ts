@@ -70,6 +70,33 @@ export interface CommitFrequencyDistribution {
   commit_count: number;
 }
 
+export interface CommitSizeDistribution {
+  size_range: string; // "small", "medium", "large", "huge"
+  count: number;
+  min_lines: number;
+  max_lines: number;
+}
+
+export interface EfficiencyTrend {
+  date: string;
+  efficiency_ratio: number; // additions / (additions + deletions)
+  total_changes: number;
+}
+
+export interface HotFile {
+  file_path: string;
+  change_count: number;
+  total_additions: number;
+  total_deletions: number;
+  last_modified: string;
+}
+
+export interface CommitMessageWord {
+  word: string;
+  count: number;
+  weight: number;
+}
+
 export interface Statistics {
   hourly: HourlyStats[];
   daily: DailyStats[];
@@ -83,6 +110,11 @@ export interface Statistics {
   hourly_commit_distribution: HourlyCommitDistribution[];
   author_activity_trends: AuthorActivityTrend[];
   commit_frequency_distribution: CommitFrequencyDistribution[];
+  // New charts data
+  commit_size_distribution: CommitSizeDistribution[];
+  efficiency_trends: EfficiencyTrend[];
+  hot_files: HotFile[];
+  commit_message_words: CommitMessageWord[];
 }
 
 export interface TimeFilter {

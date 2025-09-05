@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactECharts from 'echarts-for-react';
+import 'echarts-wordcloud'; // Import wordcloud extension
 import { Statistics, TimeFilter } from '../types';
 
 interface StatisticsChartsProps {
@@ -220,7 +221,10 @@ const StatisticsCharts: React.FC<StatisticsChartsProps> = ({ statistics, filter 
   };
 
   const getAuthorChartOption = () => {
-    const authors = Object.entries(statistics.authors).slice(0, 10); // Top 10 authors
+    // Sort authors by total contributions (additions + deletions) in descending order
+    const sortedAuthors = Object.entries(statistics.authors)
+      .sort((a, b) => (b[1].additions + b[1].deletions) - (a[1].additions + a[1].deletions))
+      .slice(0, 10); // Top 10 authors
     
     return {
       title: {
@@ -230,7 +234,7 @@ const StatisticsCharts: React.FC<StatisticsChartsProps> = ({ statistics, filter 
       tooltip: {
         trigger: 'item',
         formatter: (params: any) => {
-          const [name, data] = authors[params.dataIndex];
+          const [name, data] = sortedAuthors[params.dataIndex];
           return `${name}<br/>` +
                  `新增: ${data.additions} 行<br/>` +
                  `删除: ${data.deletions} 行<br/>` +
@@ -240,7 +244,7 @@ const StatisticsCharts: React.FC<StatisticsChartsProps> = ({ statistics, filter 
       series: [{
         type: 'pie',
         radius: '50%',
-        data: authors.map(([name, data]) => ({
+        data: sortedAuthors.map(([name, data]) => ({
           name,
           value: data.additions + data.deletions
         })),
@@ -256,7 +260,9 @@ const StatisticsCharts: React.FC<StatisticsChartsProps> = ({ statistics, filter 
   };
 
   const getRepositoryChartOption = () => {
-    const repos = Object.entries(statistics.repositories);
+    // Sort repositories by total contributions (additions + deletions) in descending order
+    const sortedRepos = Object.entries(statistics.repositories)
+      .sort((a, b) => (b[1].additions + b[1].deletions) - (a[1].additions + a[1].deletions));
     
     return {
       title: {
@@ -266,7 +272,7 @@ const StatisticsCharts: React.FC<StatisticsChartsProps> = ({ statistics, filter 
       tooltip: {
         trigger: 'item',
         formatter: (params: any) => {
-          const [name, data] = repos[params.dataIndex];
+          const [name, data] = sortedRepos[params.dataIndex];
           return `${name}<br/>` +
                  `新增: ${data.additions} 行<br/>` +
                  `删除: ${data.deletions} 行<br/>` +
@@ -276,7 +282,7 @@ const StatisticsCharts: React.FC<StatisticsChartsProps> = ({ statistics, filter 
       series: [{
         type: 'pie',
         radius: ['40%', '70%'],
-        data: repos.map(([name, data]) => ({
+        data: sortedRepos.map(([name, data]) => ({
           name: name.split('/').pop() || name, // 只显示仓库名
           value: data.additions + data.deletions
         })),
@@ -586,6 +592,232 @@ const StatisticsCharts: React.FC<StatisticsChartsProps> = ({ statistics, filter 
     };
   };
 
+  // Commit size distribution
+  const getCommitSizeDistributionChartOption = () => {
+    const sizeLabels: { [key: string]: string } = {
+      'small': '小提交 (≤10行)',
+      'medium': '中等提交 (11-100行)',
+      'large': '大提交 (101-500行)',
+      'huge': '巨型提交 (>500行)'
+    };
+
+    const colors = ['#52c41a', '#1890ff', '#faad14', '#f5222d'];
+    
+    return {
+      title: {
+        text: '提交规模分布',
+        left: 'center'
+      },
+      tooltip: {
+        trigger: 'axis',
+        formatter: (params: any) => {
+          const item = params[0];
+          const sizeData = statistics.commit_size_distribution[item.dataIndex];
+          return `${sizeLabels[sizeData.size_range]}<br/>` +
+                 `提交数量: ${sizeData.count} 次<br/>` +
+                 `代码行数范围: ${sizeData.min_lines}-${sizeData.max_lines === 2147483647 ? '∞' : sizeData.max_lines} 行`;
+        }
+      },
+      xAxis: {
+        type: 'category',
+        data: statistics.commit_size_distribution.map(d => sizeLabels[d.size_range] || d.size_range),
+        axisLabel: {
+          interval: 0,
+          rotate: 0
+        }
+      },
+      yAxis: {
+        type: 'value',
+        name: '提交次数'
+      },
+      series: [{
+        data: statistics.commit_size_distribution.map((d, index) => ({
+          value: d.count,
+          itemStyle: {
+            color: colors[index % colors.length]
+          }
+        })),
+        type: 'bar',
+        barWidth: '60%'
+      }]
+    };
+  };
+
+  // Programming efficiency trends
+  const getEfficiencyTrendsChartOption = () => {
+    // Limit to recent data for better readability
+    const recentData = statistics.efficiency_trends.slice(-30);
+    
+    return {
+      title: {
+        text: '编程效率趋势 (最近30天)',
+        subtext: '效率比例 = 新增代码 / (新增代码 + 删除代码)',
+        left: 'center'
+      },
+      tooltip: {
+        trigger: 'axis',
+        formatter: (params: any) => {
+          const data = recentData[params[0].dataIndex];
+          return `${data.date}<br/>` +
+                 `效率比例: ${(data.efficiency_ratio * 100).toFixed(1)}%<br/>` +
+                 `总变更: ${data.total_changes} 行`;
+        }
+      },
+      xAxis: {
+        type: 'category',
+        data: recentData.map(d => d.date),
+        axisLabel: {
+          rotate: 45
+        }
+      },
+      yAxis: {
+        type: 'value',
+        name: '效率比例',
+        min: 0,
+        max: 1,
+        axisLabel: {
+          formatter: (value: number) => `${(value * 100).toFixed(0)}%`
+        }
+      },
+      series: [{
+        data: recentData.map(d => d.efficiency_ratio),
+        type: 'line',
+        smooth: true,
+        lineStyle: {
+          color: '#722ed1',
+          width: 3
+        },
+        itemStyle: {
+          color: '#722ed1'
+        },
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0,
+            y: 0,
+            x2: 0,
+            y2: 1,
+            colorStops: [{
+              offset: 0, color: 'rgba(114, 46, 209, 0.3)'
+            }, {
+              offset: 1, color: 'rgba(114, 46, 209, 0.1)'
+            }]
+          }
+        }
+      }],
+      markLine: {
+        data: [{
+          yAxis: 0.5,
+          label: {
+            formatter: '平衡线 (50%)'
+          },
+          lineStyle: {
+            color: '#999',
+            type: 'dashed'
+          }
+        }]
+      }
+    };
+  };
+
+  // Hot files table component
+  const HotFilesTable = () => {
+    if (!statistics?.hot_files) {
+      return (
+        <div className="empty-state">
+          <h3>暂无热点文件数据</h3>
+        </div>
+      );
+    }
+
+    const topFiles = statistics.hot_files.slice(0, 10);
+
+    return (
+      <div className="table-container">
+        <h3 className="table-title">热点文件 TOP 10</h3>
+        <table className="hot-files-table">
+          <thead>
+            <tr>
+              <th>文件路径</th>
+              <th>修改次数</th>
+              <th>新增行数</th>
+              <th>删除行数</th>
+              <th>最后修改</th>
+            </tr>
+          </thead>
+          <tbody>
+            {topFiles.map((file, index) => (
+              <tr key={index}>
+                <td>
+                  <span className="file-path-full" title={file.file_path}>
+                    {file.file_path}
+                  </span>
+                </td>
+                <td>{file.change_count}</td>
+                <td>{file.total_additions}</td>
+                <td>{file.total_deletions}</td>
+                <td>{new Date(file.last_modified).toLocaleDateString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
+  // Commit message words (using word cloud)
+  const getCommitMessageWordsChartOption = () => {
+    const words = statistics.commit_message_words.slice(0, 30);
+    
+    return {
+      title: {
+        text: '提交消息高频词词云',
+        left: 'center'
+      },
+      tooltip: {
+        show: true,
+        formatter: (params: any) => {
+          return `${params.data.name}<br/>出现次数: ${params.data.value} 次`;
+        }
+      },
+      series: [{
+        type: 'wordCloud',
+        sizeRange: [12, 60],
+        rotationRange: [-90, 90],
+        rotationStep: 45,
+        gridSize: 8,
+        shape: 'circle',
+        width: '100%',
+        height: '100%',
+        textStyle: {
+          fontFamily: 'sans-serif',
+          fontWeight: 'bold',
+          color: function () {
+            // Random color
+            return 'rgb(' + [
+              Math.round(Math.random() * 160),
+              Math.round(Math.random() * 160),
+              Math.round(Math.random() * 160)
+            ].join(',') + ')';
+          }
+        },
+        emphasis: {
+          textStyle: {
+            shadowBlur: 10,
+            shadowColor: '#333'
+          }
+        },
+        data: words.map((w, index) => ({
+          name: w.word,
+          value: w.count,
+          textStyle: {
+            color: `rgb(${Math.round(100 + 155 * (index / words.length))}, ${Math.round(100 + 155 * (index / words.length))}, ${Math.round(200 - 100 * (index / words.length))})`
+          }
+        }))
+      }]
+    };
+  };
+
   return (
     <div className="charts-container">
       <div className="chart-card">
@@ -662,6 +894,38 @@ const StatisticsCharts: React.FC<StatisticsChartsProps> = ({ statistics, filter 
           style={{ height: '300px' }}
           notMerge={true}
         />
+      </div>
+      
+      {/* Commit Size Distribution */}
+      <div className="chart-card">
+        <ReactECharts
+          option={getCommitSizeDistributionChartOption()}
+          style={{ height: '300px' }}
+          notMerge={true}
+        />
+      </div>
+      
+      {/* Programming Efficiency Trends */}
+      <div className="chart-card">
+        <ReactECharts
+          option={getEfficiencyTrendsChartOption()}
+          style={{ height: '400px' }}
+          notMerge={true}
+        />
+      </div>
+      
+      {/* Commit Message Words */}
+      <div className="chart-card">
+        <ReactECharts
+          option={getCommitMessageWordsChartOption()}
+          style={{ height: '400px' }}
+          notMerge={true}
+        />
+      </div>
+      
+      {/* Hot Files Table */}
+      <div className="chart-card full-width">
+        <HotFilesTable />
       </div>
     </div>
   );

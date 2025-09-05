@@ -13,6 +13,12 @@ pub struct FileChange {
     pub diff: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct AnalyzedCommit {
+    pub commit: Commit,
+    pub file_changes: Vec<FileChange>,
+}
+
 pub struct GitAnalyzer {
     repo: GitRepository,
     repository_info: Repository,
@@ -29,7 +35,7 @@ impl GitAnalyzer {
         })
     }
 
-    pub fn analyze_commits(&self, since: Option<chrono::DateTime<chrono::Utc>>) -> Result<Vec<Commit>> {
+    pub fn analyze_commits(&self, since: Option<chrono::DateTime<chrono::Utc>>) -> Result<Vec<AnalyzedCommit>> {
         let mut revwalk = self.repo.revwalk()?;
         revwalk.push_head()?;
         revwalk.set_sorting(git2::Sort::TIME)?;
@@ -73,8 +79,8 @@ impl GitAnalyzer {
             // Get current branch name if possible
             let branch = self.get_current_branch().unwrap_or_else(|_| "unknown".to_string());
 
-            // Calculate diff stats
-            let (additions, deletions, files_changed) = self.get_commit_stats(&commit)?;
+            // Calculate diff stats and get file changes
+            let (additions, deletions, files_changed, file_changes) = self.get_detailed_commit_stats(&commit)?;
 
             let commit_data = Commit {
                 id: oid.to_string(),
@@ -90,7 +96,10 @@ impl GitAnalyzer {
                 branch: Some(branch),
             };
 
-            commits.push(commit_data);
+            commits.push(AnalyzedCommit {
+                commit: commit_data,
+                file_changes,
+            });
         }
 
         Ok(commits)
@@ -271,7 +280,7 @@ impl GitAnalyzer {
     }
 }
 
-pub fn analyze_repository(repository: Repository, since: Option<chrono::DateTime<chrono::Utc>>) -> Result<Vec<Commit>> {
+pub fn analyze_repository(repository: Repository, since: Option<chrono::DateTime<chrono::Utc>>) -> Result<Vec<AnalyzedCommit>> {
     if !GitAnalyzer::is_valid_git_repo(&repository.path) {
         return Err(anyhow::anyhow!("Path is not a valid git repository: {}", repository.path));
     }

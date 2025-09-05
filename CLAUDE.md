@@ -5,8 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Common Development Commands
 
 ### Development
-- `npm run dev` - Start Vite development server
+- `npm run dev` - Start Vite development server (frontend only)
 - `npm run tauri dev` - Start Tauri development mode (recommended for desktop app development)
+- `npm run tauri` - Access Tauri CLI commands directly
 
 ### Building
 - `npm run build` - Build frontend (TypeScript compilation + Vite build)
@@ -75,3 +76,10 @@ Uses SQLite with tables for:
 - SQLite database stored as `identifier.sqlite` in project root
 - Async state management with `AppState` struct to track scanning operations
 - TypeScript strict mode enabled with comprehensive type checking
+- Project uses Chinese UI language (Git Commit 统计桌面应用)
+
+## Environment Requirements
+
+- Node.js >= 16
+- Rust >= 1.60
+- Git (for repository analysis)

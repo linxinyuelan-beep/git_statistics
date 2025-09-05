@@ -113,12 +113,25 @@ pub async fn scan_last_24_hours(
         let since = Some(chrono::Utc::now() - chrono::Duration::hours(24));
         
         // Analyze commits
-        let commits = analyze_repository(repository.clone(), since)?;
-        let commit_count = commits.len() as i32;
+        let analyzed_commits = analyze_repository(repository.clone(), since)?;
+        let commit_count = analyzed_commits.len() as i32;
+        
+        // Extract commits and file changes
+        let commits: Vec<Commit> = analyzed_commits.iter().map(|ac| ac.commit.clone()).collect();
         
         // Save to database
         if !commits.is_empty() {
             database::save_commits(&pool, &commits).await?;
+            
+            // Save file changes for each commit
+            for analyzed_commit in analyzed_commits {
+                database::save_file_changes(
+                    &pool, 
+                    &analyzed_commit.commit.id, 
+                    analyzed_commit.commit.repository_id, 
+                    &analyzed_commit.file_changes
+                ).await?;
+            }
         }
         
         // Update last scanned time
@@ -176,12 +189,25 @@ async fn scan_repository_internal(
         };
         
         // Analyze commits
-        let commits = analyze_repository(repository.clone(), since)?;
-        let commit_count = commits.len() as i32;
+        let analyzed_commits = analyze_repository(repository.clone(), since)?;
+        let commit_count = analyzed_commits.len() as i32;
+        
+        // Extract commits and file changes
+        let commits: Vec<Commit> = analyzed_commits.iter().map(|ac| ac.commit.clone()).collect();
         
         // Save to database
         if !commits.is_empty() {
             database::save_commits(&pool, &commits).await?;
+            
+            // Save file changes for each commit
+            for analyzed_commit in analyzed_commits {
+                database::save_file_changes(
+                    &pool, 
+                    &analyzed_commit.commit.id, 
+                    analyzed_commit.commit.repository_id, 
+                    &analyzed_commit.file_changes
+                ).await?;
+            }
         }
         
         // Update last scanned time (only for incremental scan)

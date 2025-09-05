@@ -358,6 +358,10 @@ body {
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
+.chart-card.full-width {
+  grid-column: 1 / -1;
+}
+
 .chart-title {
   margin-bottom: 1rem;
   font-size: 1.1rem;
@@ -1036,4 +1040,104 @@ body {
 
 .commit-detail-page .error {
   color: #dc3545;
+}
+
+/* Hot Files Table Styles */
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.table-title {
+  text-align: center;
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: #333;
+}
+
+.hot-files-table {
+  width: 100%;
+  border-collapse: collapse;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.hot-files-table thead {
+  background-color: #007acc;
+  color: white;
+}
+
+.hot-files-table th {
+  padding: 12px 15px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.hot-files-table tbody tr {
+  border-bottom: 1px solid #e0e0e0;
+  transition: background-color 0.2s;
+}
+
+.hot-files-table tbody tr:nth-of-type(even) {
+  background-color: #f8f9fa;
+}
+
+.hot-files-table tbody tr:hover {
+  background-color: #e9f5ff;
+}
+
+.hot-files-table td {
+  padding: 12px 15px;
+  font-size: 0.9rem;
+}
+
+.hot-files-table td:first-child {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 0.85rem;
+  max-width: 300px;
+  word-break: break-all;
+}
+
+.hot-files-table .file-path-full {
+  cursor: pointer;
+  position: relative;
+  color: #007acc;
+  text-decoration: underline;
+}
+
+.hot-files-table .file-path-full:hover {
+  color: #005a9e;
+}
+
+/* Tooltip for full path */
+.tooltip {
+  position: absolute;
+  background: #333;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  z-index: 100;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  top: -40px;
+  left: 0;
+}
+
+@media (max-width: 768px) {
+  .hot-files-table {
+    font-size: 0.8rem;
+  }
+  
+  .hot-files-table th,
+  .hot-files-table td {
+    padding: 8px 10px;
+  }
+  
+  .hot-files-table td:first-child {
+    max-width: 150px;
+  }
 }

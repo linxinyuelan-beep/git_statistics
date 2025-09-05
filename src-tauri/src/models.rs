@@ -111,6 +111,37 @@ pub struct CommitFrequencyDistribution {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct CommitSizeDistribution {
+    pub size_range: String, // "small", "medium", "large", "huge"
+    pub count: i32,
+    pub min_lines: i32,
+    pub max_lines: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EfficiencyTrend {
+    pub date: String,
+    pub efficiency_ratio: f64, // additions / (additions + deletions)
+    pub total_changes: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct HotFile {
+    pub file_path: String,
+    pub change_count: i32,
+    pub total_additions: i32,
+    pub total_deletions: i32,
+    pub last_modified: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CommitMessageWord {
+    pub word: String,
+    pub count: i32,
+    pub weight: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Statistics {
     pub hourly: Vec<HourlyStats>,
     pub daily: Vec<DailyStats>,
@@ -124,6 +155,11 @@ pub struct Statistics {
     pub hourly_commit_distribution: Vec<HourlyCommitDistribution>,
     pub author_activity_trends: Vec<AuthorActivityTrend>,
     pub commit_frequency_distribution: Vec<CommitFrequencyDistribution>,
+    // New charts data
+    pub commit_size_distribution: Vec<CommitSizeDistribution>,
+    pub efficiency_trends: Vec<EfficiencyTrend>,
+    pub hot_files: Vec<HotFile>,
+    pub commit_message_words: Vec<CommitMessageWord>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
