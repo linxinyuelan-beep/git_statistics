@@ -30,6 +30,7 @@ fn main() {
             get_repositories,
             scan_repository,
             force_scan_repository,
+            scan_last_24_hours,
             get_statistics,
             get_commit_timeline,
             get_commit_detail

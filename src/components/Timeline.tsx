@@ -4,17 +4,28 @@ import { useNavigate } from 'react-router-dom';
 
 interface TimelineProps {
   commits: CommitData[];
+  filter: {
+    searchTerm?: string;
+    author?: string;
+  };
+  onFilterChange: (newFilter: { searchTerm?: string; author?: string }) => void;
 }
 
-const Timeline: React.FC<TimelineProps> = ({ commits }) => {
+const Timeline: React.FC<TimelineProps> = ({ commits, filter, onFilterChange }) => {
   const navigate = useNavigate();
   const timelineRef = useRef<HTMLDivElement>(null);
   
-  // 将 Hooks 调用移到组件顶部
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedAuthor, setSelectedAuthor] = useState('');
+  // 使用传入的筛选条件
+  const { searchTerm = '', author: selectedAuthor = '' } = filter;
   
+  // 更新筛选条件的函数
+  const handleSearchChange = (term: string) => {
+    onFilterChange({ ...filter, searchTerm: term });
+  };
   
+  const handleAuthorChange = (author: string) => {
+    onFilterChange({ ...filter, author });
+  };
   
   // 使用 localStorage 保存和恢复滚动位置
   useEffect(() => {
@@ -62,7 +73,16 @@ const Timeline: React.FC<TimelineProps> = ({ commits }) => {
   }, [commits]); // 当commits数据加载完成时触发
 
   // 在这里处理条件渲染
-  if (!commits || commits.length === 0) {
+  if (!commits) {
+    return (
+      <div className="empty-state">
+        <h3>加载中...</h3>
+        <p>正在加载提交数据</p>
+      </div>
+    );
+  }
+  
+  if (commits.length === 0) {
     return (
       <div className="empty-state">
         <h3>暂无提交数据</h3>
@@ -114,7 +134,7 @@ const Timeline: React.FC<TimelineProps> = ({ commits }) => {
             type="text"
             placeholder="搜索提交消息或作者..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="search-input"
           />
         </div>
@@ -122,7 +142,7 @@ const Timeline: React.FC<TimelineProps> = ({ commits }) => {
         <div className="filter-group">
           <select
             value={selectedAuthor}
-            onChange={(e) => setSelectedAuthor(e.target.value)}
+            onChange={(e) => handleAuthorChange(e.target.value)}
             className="author-select"
           >
             <option value="">所有作者</option>

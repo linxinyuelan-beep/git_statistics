@@ -79,6 +79,63 @@ pub async fn force_scan_repository(
     scan_repository_internal(app_handle, repository_id, state, false).await
 }
 
+#[command]
+pub async fn scan_last_24_hours(
+    app_handle: AppHandle, 
+    repository_id: i64,
+    state: State<'_, AppState>
+) -> Result<i32, String> {
+    // Check if already scanning
+    {
+        let scanning = state.scanning.lock().unwrap();
+        if *scanning {
+            return Err("正在扫描中，请稍候...".to_string());
+        }
+    }
+
+    // Set scanning flag
+    {
+        let mut scanning = state.scanning.lock().unwrap();
+        *scanning = true;
+    }
+
+    let result = async {
+        let pool = get_db_pool(&app_handle).await?;
+        
+        // Get repository info
+        let repositories = database::get_repositories(&pool).await?;
+        let repository = repositories
+            .into_iter()
+            .find(|r| r.id == repository_id)
+            .ok_or_else(|| anyhow::anyhow!("Repository not found"))?;
+        
+        // Calculate the time 24 hours ago
+        let since = Some(chrono::Utc::now() - chrono::Duration::hours(24));
+        
+        // Analyze commits
+        let commits = analyze_repository(repository.clone(), since)?;
+        let commit_count = commits.len() as i32;
+        
+        // Save to database
+        if !commits.is_empty() {
+            database::save_commits(&pool, &commits).await?;
+        }
+        
+        // Update last scanned time
+        database::update_repository_scan_time(&pool, repository_id).await?;
+        
+        Ok(commit_count)
+    }.await;
+
+    // Clear scanning flag
+    {
+        let mut scanning = state.scanning.lock().unwrap();
+        *scanning = false;
+    }
+
+    result.map_err(|e: anyhow::Error| format!("扫描仓库失败: {}", e))
+}
+
 async fn scan_repository_internal(
     app_handle: AppHandle, 
     repository_id: i64,

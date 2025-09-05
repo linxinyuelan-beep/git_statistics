@@ -58,6 +58,11 @@ function App() {
       
       // 清除标记，避免重复触发
       sessionStorage.removeItem('returning-from-commit-detail');
+      
+      // 确保数据重新加载
+      if (repositories.length > 0) {
+        loadData();
+      }
     }
   }, [location.pathname]); // 改为监听路径变化
 
@@ -245,6 +250,58 @@ function App() {
     }
   };
 
+  const handleRefreshLast24Hours = async () => {
+    setLoading(true);
+    setLoadingProgress({ current: 0, total: repositories.length, message: '开始刷新过去一天数据...' });
+    
+    try {
+      // Scan last 24 hours for all repositories
+      for (let i = 0; i < repositories.length; i++) {
+        const repo = repositories[i];
+        // Update progress
+        setLoadingProgress({ 
+          current: i, 
+          total: repositories.length, 
+          message: `正在刷新仓库: ${repo.name} (${i+1}/${repositories.length})` 
+        });
+        
+        // For long-running repository scans, show fake progress
+        let fakeProgressCurrent = 0;
+        const fakeProgressTotal = 100;
+        const fakeProgressInterval = setInterval(() => {
+          if (fakeProgressCurrent < fakeProgressTotal - 1) {
+            fakeProgressCurrent += 1;
+            setLoadingProgress({ 
+              current: i + (fakeProgressCurrent / fakeProgressTotal), 
+              total: repositories.length, 
+              message: `正在刷新仓库: ${repo.name} - ${fakeProgressCurrent}%` 
+            });
+          }
+        }, 50);
+        
+        try {
+          await invoke('scan_last_24_hours', { repositoryId: repo.id });
+        } finally {
+          clearInterval(fakeProgressInterval);
+        }
+      }
+      
+      setLoadingProgress({ 
+        current: repositories.length, 
+        total: repositories.length, 
+        message: '刷新完成，正在加载数据...' 
+      });
+      
+      // Reload data with current filters
+      await loadData();
+    } catch (error) {
+      console.error('Failed to refresh last 24 hours data:', error);
+    } finally {
+      setLoading(false);
+      setLoadingProgress(null);
+    }
+  };
+
   return (
     <div className="app">
       <header className="app-header">
@@ -252,7 +309,10 @@ function App() {
           <h1>Commit 统计</h1>
           <div className="header-actions">
             <button onClick={handleRefreshData} disabled={loading}>
-              {loading ? '分析中...' : '刷新数据'}
+              {loading ? '分析中...' : '增量刷新'}
+            </button>
+            <button onClick={handleRefreshLast24Hours} disabled={loading}>
+              {loading ? '分析中...' : '刷新一天'}
             </button>
             <button onClick={handleForceRefreshData} disabled={loading}>
               {loading ? '分析中...' : '全量刷新'}
@@ -310,6 +370,12 @@ function App() {
             </select>
           </div>
           <div className="quick-filters">
+            <button onClick={() => setFilter({ 
+              start_date: new Date().toISOString().split('T')[0],
+              end_date: new Date().toISOString().split('T')[0]
+            })}>
+              今日
+            </button>
             <button onClick={() => setFilter({ start_date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0] })}>
               昨天
             </button>
@@ -375,7 +441,20 @@ function App() {
               <StatisticsCharts statistics={statistics} filter={filter} />
             )}
             {activeTab === 'timeline' && (
-              <Timeline commits={timeline} />
+              <Timeline 
+                commits={timeline} 
+                filter={{
+                  searchTerm: filter.search_term,
+                  author: filter.author
+                }}
+                onFilterChange={(newFilter) => {
+                  setFilter(prev => ({
+                    ...prev,
+                    search_term: newFilter.searchTerm,
+                    author: newFilter.author
+                  }));
+                }}
+              />
             )}
           </div>
         </main>
