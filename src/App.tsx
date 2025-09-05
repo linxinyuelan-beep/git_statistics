@@ -18,19 +18,44 @@ function App() {
     const savedTab = localStorage.getItem('activeTab');
     return savedTab === 'timeline' ? 'timeline' : 'charts';
   });
-  const [filter, setFilter] = useState<TimeFilter>({});
+  const [filter, setFilter] = useState<TimeFilter>(() => {
+    // 从 localStorage 恢复筛选条件
+    const savedFilter = localStorage.getItem('git-stats-filter');
+    if (savedFilter) {
+      try {
+        return JSON.parse(savedFilter);
+      } catch (e) {
+        console.error('解析筛选条件失败:', e);
+        return {};
+      }
+    }
+    return {};
+  });
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
     const saved = localStorage.getItem('sidebarCollapsed');
     return saved === 'true';
   });
 
-  // 当从提交详情页面返回时，自动切换到时间线标签页
+  // 当从提交详情页面返回时，自动切换到时间线标签页并恢复筛选条件
   useEffect(() => {
     const isReturningFromCommitDetail = sessionStorage.getItem('returning-from-commit-detail') === 'true';
     if (isReturningFromCommitDetail) {
       console.log('从提交详情页面返回，切换到时间线标签页');
       setActiveTab('timeline');
       localStorage.setItem('activeTab', 'timeline');
+      
+      // 恢复筛选条件
+      const savedFilter = localStorage.getItem('git-stats-filter');
+      if (savedFilter) {
+        try {
+          const parsedFilter = JSON.parse(savedFilter);
+          setFilter(parsedFilter);
+          console.log('恢复筛选条件:', parsedFilter);
+        } catch (e) {
+          console.error('解析筛选条件失败:', e);
+        }
+      }
+      
       // 清除标记，避免重复触发
       sessionStorage.removeItem('returning-from-commit-detail');
     }
@@ -39,6 +64,11 @@ function App() {
   useEffect(() => {
     loadRepositories();
   }, []);
+
+  // 保存筛选条件到 localStorage
+  useEffect(() => {
+    localStorage.setItem('git-stats-filter', JSON.stringify(filter));
+  }, [filter]);
 
   useEffect(() => {
     if (repositories.length > 0) {
@@ -219,7 +249,7 @@ function App() {
     <div className="app">
       <header className="app-header">
         <div className="header-top">
-          <h1>Git Commit 统计</h1>
+          <h1>Commit 统计</h1>
           <div className="header-actions">
             <button onClick={handleRefreshData} disabled={loading}>
               {loading ? '分析中...' : '刷新数据'}
@@ -280,13 +310,13 @@ function App() {
             </select>
           </div>
           <div className="quick-filters">
-            <button onClick={() => setFilter(prev => ({ ...prev, start_date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0], end_date: undefined }))}>
+            <button onClick={() => setFilter({ start_date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0] })}>
               昨天
             </button>
-            <button onClick={() => setFilter(prev => ({ ...prev, start_date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], end_date: undefined }))}>
+            <button onClick={() => setFilter({ start_date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] })}>
               过去7天
             </button>
-            <button onClick={() => setFilter(prev => ({ ...prev, start_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], end_date: undefined }))}>
+            <button onClick={() => setFilter({ start_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] })}>
               过去30天
             </button>
             <button onClick={() => setFilter({})}>

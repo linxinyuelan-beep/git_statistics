@@ -370,6 +370,222 @@ const StatisticsCharts: React.FC<StatisticsChartsProps> = ({ statistics, filter 
     };
   };
 
+  // Hourly commit distribution heatmap (hour x day of week)
+  const getHourlyCommitDistributionChartOption = () => {
+    // Create a 24x7 matrix for the heatmap
+    const hours = Array.from({ length: 24 }, (_, i) => i);
+    const days = Array.from({ length: 7 }, (_, i) => i);
+    const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+    
+    // Prepare data for heatmap
+    const heatmapData = [];
+    for (const hour of hours) {
+      for (const day of days) {
+        const stat = statistics.hourly_commit_distribution.find(
+          h => h.hour === hour && h.day_of_week === day
+        );
+        const commitCount = stat ? stat.commits : 0;
+        heatmapData.push([hour, day, commitCount]);
+      }
+    }
+    
+    return {
+      title: {
+        text: '代码提交活跃时段热力图',
+        left: 'center'
+      },
+      tooltip: {
+        position: 'top',
+        formatter: (params: any) => {
+          const [hour, day, commits] = params.data;
+          return `${weekdays[day]} ${hour}:00-${hour + 1}:00<br/>` +
+                 `提交次数: ${commits} 次`;
+        }
+      },
+      grid: {
+        height: '50%',
+        top: '20%'
+      },
+      xAxis: {
+        type: 'category',
+        data: hours.map(h => `${h}:00`),
+        splitArea: {
+          show: true
+        },
+        axisLabel: {
+          interval: 1
+        }
+      },
+      yAxis: {
+        type: 'category',
+        data: weekdays,
+        splitArea: {
+          show: true
+        }
+      },
+      visualMap: {
+        min: 0,
+        max: Math.max(1, ...heatmapData.map(item => item[2])), // Ensure max is at least 1
+        calculable: true,
+        orient: 'horizontal',
+        left: 'center',
+        bottom: '15%',
+        inRange: {
+          color: ['#ebedf0', '#c6e48b', '#7bc96f', '#239a3b', '#196127']
+        }
+      },
+      series: [{
+        name: '提交次数',
+        type: 'heatmap',
+        data: heatmapData,
+        label: {
+          show: false
+        },
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 10,
+            shadowColor: 'rgba(0, 0, 0, 0.5)'
+          }
+        }
+      }]
+    };
+  };
+
+  // Author activity trends
+  const getAuthorActivityTrendsChartOption = () => {
+    // Get unique authors and periods
+    const authors = Array.from(new Set(statistics.author_activity_trends.map(a => a.author)));
+    const periods = Array.from(new Set(statistics.author_activity_trends.map(a => a.period))).sort();
+    
+    // Only show top 10 most active authors to avoid cluttering the chart
+    const authorStats = authors.map(author => {
+      const authorData = statistics.author_activity_trends.filter(a => a.author === author);
+      const totalCommits = authorData.reduce((sum, a) => sum + a.commits, 0);
+      return { author, totalCommits };
+    }).sort((a, b) => b.totalCommits - a.totalCommits).slice(0, 10);
+    
+    const topAuthors = authorStats.map(s => s.author);
+    
+    // Create series for each top author
+    const series = topAuthors.map(author => {
+      const authorData = statistics.author_activity_trends.filter(a => a.author === author);
+      const data = periods.map(period => {
+        const stat = authorData.find(a => a.period === period);
+        return stat ? stat.commits : null; // Use null for missing data points
+      });
+      
+      return {
+        name: author,
+        type: 'line',
+        data: data,
+        connectNulls: false,
+        showSymbol: false, // Hide data points to reduce clutter
+        lineStyle: {
+          width: 2
+        }
+      };
+    });
+    
+    // Limit the number of x-axis labels to prevent overcrowding
+    const maxLabels = 30;
+    let xAxisData = periods;
+    let interval = 0;
+    
+    if (periods.length > maxLabels) {
+      interval = Math.floor(periods.length / maxLabels);
+      xAxisData = periods.filter((_, i) => i % (interval + 1) === 0);
+    }
+    
+    return {
+      title: {
+        text: '贡献者活跃度趋势 (Top 10)',
+        left: 'center'
+      },
+      tooltip: {
+        trigger: 'axis',
+        formatter: (params: any) => {
+          let tooltip = params[0].axisValueLabel + '<br/>';
+          params.forEach((param: any) => {
+            if (param.data !== null) {
+              tooltip += `${param.marker} ${param.seriesName}: ${param.data} 次提交<br/>`;
+            }
+          });
+          return tooltip;
+        }
+      },
+      legend: {
+        data: topAuthors,
+        top: '10%',
+        type: 'scroll' // Enable scrolling for long lists
+      },
+      xAxis: {
+        type: 'category',
+        data: xAxisData,
+        axisLabel: {
+          interval: interval,
+          rotate: 45
+        }
+      },
+      yAxis: {
+        type: 'value',
+        name: '提交次数'
+      },
+      series: series,
+      dataZoom: [
+        {
+          type: 'inside',
+          start: 0,
+          end: 100
+        },
+        {
+          type: 'slider',
+          start: 0,
+          end: 100,
+          bottom: 10
+        }
+      ]
+    };
+  };
+
+  // Commit frequency distribution
+  const getCommitFrequencyDistributionChartOption = () => {
+    // Limit to last 30 days for better readability
+    const recentData = statistics.commit_frequency_distribution.slice(0, 30);
+    const data = recentData.map(d => [d.date, d.commit_count]);
+    
+    return {
+      title: {
+        text: '代码提交频率分布 (最近30天)',
+        left: 'center'
+      },
+      tooltip: {
+        trigger: 'axis',
+        formatter: (params: any) => {
+          const [date, count] = params[0].data;
+          return `${date}<br/>提交次数: ${count} 次`;
+        }
+      },
+      xAxis: {
+        type: 'category',
+        data: recentData.map(d => d.date),
+        axisLabel: {
+          rotate: 45
+        }
+      },
+      yAxis: {
+        type: 'value',
+        name: '提交次数'
+      },
+      series: [{
+        data: data,
+        type: 'bar',
+        itemStyle: {
+          color: '#1f77b4'
+        }
+      }]
+    };
+  };
+
   return (
     <div className="charts-container">
       <div className="chart-card">
@@ -396,6 +612,42 @@ const StatisticsCharts: React.FC<StatisticsChartsProps> = ({ statistics, filter 
         />
       </div>
       
+      {/* Hourly Commit Distribution Heatmap */}
+      <div className="chart-card">
+        <ReactECharts
+          option={getHourlyCommitDistributionChartOption()}
+          style={{ height: '400px' }}
+          notMerge={true}
+        />
+      </div>
+      
+      {/* Author Activity Trends */}
+      <div className="chart-card">
+        <ReactECharts
+          option={getAuthorActivityTrendsChartOption()}
+          style={{ height: '400px' }}
+          notMerge={true}
+        />
+      </div>
+      
+      {/* Commit Frequency Distribution */}
+      <div className="chart-card">
+        <ReactECharts
+          option={getCommitFrequencyDistributionChartOption()}
+          style={{ height: '300px' }}
+          notMerge={true}
+        />
+      </div>
+      
+      {/* Calendar Heatmap Chart */}
+      <div className="chart-card">
+        <ReactECharts
+          option={getCalendarChartOption()}
+          style={{ height: '300px' }}
+          notMerge={true}
+        />
+      </div>
+      
       <div className="chart-card">
         <ReactECharts
           option={getAuthorChartOption()}
@@ -407,15 +659,6 @@ const StatisticsCharts: React.FC<StatisticsChartsProps> = ({ statistics, filter 
       <div className="chart-card">
         <ReactECharts
           option={getRepositoryChartOption()}
-          style={{ height: '300px' }}
-          notMerge={true}
-        />
-      </div>
-      
-      {/* Calendar Heatmap Chart */}
-      <div className="chart-card">
-        <ReactECharts
-          option={getCalendarChartOption()}
           style={{ height: '300px' }}
           notMerge={true}
         />

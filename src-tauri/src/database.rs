@@ -374,6 +374,80 @@ pub async fn get_statistics(pool: &SqlitePool, filter: &TimeFilter) -> Result<St
         repositories.insert(repo_name, stats);
     }
 
+    // Get hourly commit distribution for heatmap (hour x day of week)
+    let hourly_dist_query = format!(
+        "SELECT strftime('%H', timestamp, 'localtime') as hour,
+         strftime('%w', timestamp, 'localtime') as day_of_week,
+         COUNT(*) as commits
+         {} GROUP BY hour, day_of_week ORDER BY hour, day_of_week",
+        base_query
+    );
+    
+    let mut query_builder = sqlx::query(&hourly_dist_query);
+    for param in &params {
+        query_builder = query_builder.bind(param);
+    }
+    
+    let hourly_dist_rows = query_builder.fetch_all(pool).await?;
+    let hourly_commit_distribution: Vec<HourlyCommitDistribution> = hourly_dist_rows
+        .into_iter()
+        .map(|row| HourlyCommitDistribution {
+            hour: row.get::<String, _>("hour").parse().unwrap_or(0),
+            day_of_week: row.get::<String, _>("day_of_week").parse().unwrap_or(0),
+            commits: row.get("commits"),
+        })
+        .collect();
+
+    // Get author activity trends (daily)
+    let author_trend_query = format!(
+        "SELECT author,
+         DATE(timestamp) as period,
+         COUNT(*) as commits,
+         SUM(additions) as additions,
+         SUM(deletions) as deletions
+         {} GROUP BY author, period ORDER BY period, commits DESC",
+        base_query
+    );
+    
+    let mut query_builder = sqlx::query(&author_trend_query);
+    for param in &params {
+        query_builder = query_builder.bind(param);
+    }
+    
+    let author_trend_rows = query_builder.fetch_all(pool).await?;
+    let author_activity_trends: Vec<AuthorActivityTrend> = author_trend_rows
+        .into_iter()
+        .map(|row| AuthorActivityTrend {
+            author: row.get("author"),
+            period: row.get("period"),
+            commits: row.get("commits"),
+            additions: row.get("additions"),
+            deletions: row.get("deletions"),
+        })
+        .collect();
+
+    // Get commit frequency distribution (commits per day)
+    let freq_dist_query = format!(
+        "SELECT DATE(timestamp) as date,
+         COUNT(*) as commit_count
+         {} GROUP BY date ORDER BY date",
+        base_query
+    );
+    
+    let mut query_builder = sqlx::query(&freq_dist_query);
+    for param in &params {
+        query_builder = query_builder.bind(param);
+    }
+    
+    let freq_dist_rows = query_builder.fetch_all(pool).await?;
+    let commit_frequency_distribution: Vec<CommitFrequencyDistribution> = freq_dist_rows
+        .into_iter()
+        .map(|row| CommitFrequencyDistribution {
+            date: row.get("date"),
+            commit_count: row.get("commit_count"),
+        })
+        .collect();
+
     Ok(Statistics {
         hourly,
         daily,
@@ -383,5 +457,8 @@ pub async fn get_statistics(pool: &SqlitePool, filter: &TimeFilter) -> Result<St
         total_deletions,
         authors,
         repositories,
+        hourly_commit_distribution,
+        author_activity_trends,
+        commit_frequency_distribution,
     })
 }

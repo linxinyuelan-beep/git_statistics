@@ -89,6 +89,28 @@ pub struct RepositoryStats {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct HourlyCommitDistribution {
+    pub hour: i32,
+    pub day_of_week: i32, // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    pub commits: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AuthorActivityTrend {
+    pub author: String,
+    pub period: String, // Format: "YYYY-MM" for monthly
+    pub commits: i32,
+    pub additions: i32,
+    pub deletions: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CommitFrequencyDistribution {
+    pub date: String,
+    pub commit_count: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Statistics {
     pub hourly: Vec<HourlyStats>,
     pub daily: Vec<DailyStats>,
@@ -98,6 +120,10 @@ pub struct Statistics {
     pub total_deletions: i32,
     pub authors: std::collections::HashMap<String, AuthorStats>,
     pub repositories: std::collections::HashMap<String, RepositoryStats>,
+    // New fields for additional charts
+    pub hourly_commit_distribution: Vec<HourlyCommitDistribution>,
+    pub author_activity_trends: Vec<AuthorActivityTrend>,
+    pub commit_frequency_distribution: Vec<CommitFrequencyDistribution>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

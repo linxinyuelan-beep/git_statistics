@@ -51,6 +51,25 @@ export interface WeeklyStats {
   commits: number;
 }
 
+export interface HourlyCommitDistribution {
+  hour: number;
+  day_of_week: number; // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  commits: number;
+}
+
+export interface AuthorActivityTrend {
+  author: string;
+  period: string; // Format: "YYYY-MM" for monthly
+  commits: number;
+  additions: number;
+  deletions: number;
+}
+
+export interface CommitFrequencyDistribution {
+  date: string;
+  commit_count: number;
+}
+
 export interface Statistics {
   hourly: HourlyStats[];
   daily: DailyStats[];
@@ -60,6 +79,10 @@ export interface Statistics {
   total_deletions: number;
   authors: { [key: string]: { additions: number; deletions: number; commits: number } };
   repositories: { [key: string]: { additions: number; deletions: number; commits: number } };
+  // New fields for additional charts
+  hourly_commit_distribution: HourlyCommitDistribution[];
+  author_activity_trends: AuthorActivityTrend[];
+  commit_frequency_distribution: CommitFrequencyDistribution[];
 }
 
 export interface TimeFilter {
