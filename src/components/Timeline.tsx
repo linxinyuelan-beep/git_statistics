@@ -17,6 +17,19 @@ const Timeline: React.FC<TimelineProps> = ({ commits, filter, onFilterChange }) 
   // 使用传入的筛选条件
   const { searchTerm = '' } = filter;
   
+  // 统一折叠状态管理
+  const [collapsed, setCollapsed] = useState(() => {
+    const saved = localStorage.getItem('timeline-collapsed');
+    return saved === 'true';
+  });
+  
+  // 保存折叠状态到 localStorage
+  const toggleCollapse = () => {
+    const newState = !collapsed;
+    setCollapsed(newState);
+    localStorage.setItem('timeline-collapsed', newState.toString());
+  };
+  
   // 更新筛选条件的函数
   const handleSearchChange = (term: string) => {
     onFilterChange({ searchTerm: term });
@@ -121,36 +134,43 @@ const Timeline: React.FC<TimelineProps> = ({ commits, filter, onFilterChange }) 
 
   return (
     <div className="timeline-container">
-      <div className="timeline-filters">
-        <div className="filter-group">
-          <input
-            type="text"
-            placeholder="搜索提交消息或作者..."
-            value={searchTerm}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            className="search-input"
-          />
-        </div>
+      <div className="timeline-section-header" onClick={toggleCollapse}>
+        <h3>筛选和统计 {collapsed ? '▶' : '▼'}</h3>
       </div>
-
-      <div className="timeline-stats">
-        <div className="stat-item">
-          <span className="stat-label">显示提交:</span>
-          <span className="stat-value">{filteredCommits.length}</span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-label">总新增:</span>
-          <span className="stat-value text-green">
-            +{filteredCommits.reduce((sum, c) => sum + c.additions, 0)}
-          </span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-label">总删除:</span>
-          <span className="stat-value text-red">
-            -{filteredCommits.reduce((sum, c) => sum + c.deletions, 0)}
-          </span>
-        </div>
-      </div>
+      {!collapsed && (
+        <>
+          <div className="timeline-filters">
+            <div className="filter-group">
+              <input
+                type="text"
+                placeholder="搜索提交消息或作者..."
+                value={searchTerm}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="search-input"
+              />
+            </div>
+          </div>
+          
+          <div className="timeline-stats">
+            <div className="stat-item">
+              <span className="stat-label">显示提交:</span>
+              <span className="stat-value">{filteredCommits.length}</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-label">总新增:</span>
+              <span className="stat-value text-green">
+                +{filteredCommits.reduce((sum, c) => sum + c.additions, 0)}
+              </span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-label">总删除:</span>
+              <span className="stat-value text-red">
+                -{filteredCommits.reduce((sum, c) => sum + c.deletions, 0)}
+              </span>
+            </div>
+          </div>
+        </>
+      )}
 
       <div className="timeline-list" ref={timelineRef}>
         {filteredCommits.map((commit) => (
