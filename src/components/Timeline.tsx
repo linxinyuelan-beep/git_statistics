@@ -12,16 +12,9 @@ const Timeline: React.FC<TimelineProps> = ({ commits }) => {
   
   // 将 Hooks 调用移到组件顶部
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedAuthor, setSelectedAuthor] = useState(() => {
-    // 从 localStorage 恢复作者筛选条件
-    const savedAuthor = localStorage.getItem('timeline-selected-author');
-    return savedAuthor || '';
-  });
+  const [selectedAuthor, setSelectedAuthor] = useState('');
   
-  // 保存作者筛选条件到 localStorage
-  useEffect(() => {
-    localStorage.setItem('timeline-selected-author', selectedAuthor);
-  }, [selectedAuthor]);
+  
   
   // 使用 localStorage 保存和恢复滚动位置
   useEffect(() => {
