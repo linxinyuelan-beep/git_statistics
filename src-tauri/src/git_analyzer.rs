@@ -37,7 +37,10 @@ impl GitAnalyzer {
 
     pub fn analyze_commits(&self, since: Option<chrono::DateTime<chrono::Utc>>) -> Result<Vec<AnalyzedCommit>> {
         let mut revwalk = self.repo.revwalk()?;
-        revwalk.push_head()?;
+        // Push all local branches instead of just HEAD
+        revwalk.push_glob("refs/heads/*")?;
+        // Also push all remote branches
+        revwalk.push_glob("refs/remotes/*")?;
         revwalk.set_sorting(git2::Sort::TIME)?;
 
         let mut commits = Vec::new();
@@ -77,7 +80,7 @@ impl GitAnalyzer {
                 .unwrap_or_default();
 
             // Get current branch name if possible
-            let branch = self.get_current_branch().unwrap_or_else(|_| "unknown".to_string());
+            let branch = self.get_commit_branch(&commit)?;
 
             // Calculate diff stats and get file changes
             let (additions, deletions, files_changed, file_changes) = self.get_detailed_commit_stats(&commit)?;
@@ -145,7 +148,7 @@ impl GitAnalyzer {
             .unwrap_or_default();
 
         // Get current branch name if possible
-        let branch = self.get_current_branch().unwrap_or_else(|_| "unknown".to_string());
+        let branch = self.get_commit_branch(&commit)?;
 
         // Calculate diff stats and get file changes
         let (additions, deletions, files_changed, file_changes) = self.get_detailed_commit_stats(&commit)?;
@@ -265,13 +268,45 @@ impl GitAnalyzer {
         ))
     }
 
-    fn get_current_branch(&self) -> Result<String> {
-        let head = self.repo.head()?;
-        if let Some(name) = head.shorthand() {
-            Ok(name.to_string())
-        } else {
-            Ok("HEAD".to_string())
+    fn get_commit_branch(&self, commit: &git2::Commit) -> Result<String> {
+        // Try to find which branch this commit belongs to
+        let mut branch_name = "unknown".to_string();
+        
+        // Iterate through all local branches
+        if let Ok(branches) = self.repo.branches(Some(git2::BranchType::Local)) {
+            for branch_result in branches {
+                if let Ok((branch, _)) = branch_result {
+                    if let Ok(Some(branch_commit)) = branch.get().peel_to_commit().map(|c| c.into()) {
+                        if branch_commit.id() == commit.id() {
+                            if let Ok(Some(name)) = branch.name() {
+                                branch_name = name.to_string();
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
         }
+        
+        // If not found in local branches, check remote branches
+        if branch_name == "unknown" {
+            if let Ok(branches) = self.repo.branches(Some(git2::BranchType::Remote)) {
+                for branch_result in branches {
+                    if let Ok((branch, _)) = branch_result {
+                        if let Ok(Some(branch_commit)) = branch.get().peel_to_commit().map(|c| c.into()) {
+                            if branch_commit.id() == commit.id() {
+                                if let Ok(Some(name)) = branch.name() {
+                                    branch_name = name.to_string();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        Ok(branch_name)
     }
 
     pub fn is_valid_git_repo(path: &str) -> bool {
