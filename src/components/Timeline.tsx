@@ -6,9 +6,8 @@ interface TimelineProps {
   commits: CommitData[];
   filter: {
     searchTerm?: string;
-    author?: string;
   };
-  onFilterChange: (newFilter: { searchTerm?: string; author?: string }) => void;
+  onFilterChange: (newFilter: { searchTerm?: string }) => void;
 }
 
 const Timeline: React.FC<TimelineProps> = ({ commits, filter, onFilterChange }) => {
@@ -16,15 +15,11 @@ const Timeline: React.FC<TimelineProps> = ({ commits, filter, onFilterChange }) 
   const timelineRef = useRef<HTMLDivElement>(null);
   
   // 使用传入的筛选条件
-  const { searchTerm = '', author: selectedAuthor = '' } = filter;
+  const { searchTerm = '' } = filter;
   
   // 更新筛选条件的函数
   const handleSearchChange = (term: string) => {
-    onFilterChange({ ...filter, searchTerm: term });
-  };
-  
-  const handleAuthorChange = (author: string) => {
-    onFilterChange({ ...filter, author });
+    onFilterChange({ searchTerm: term });
   };
   
   // 使用 localStorage 保存和恢复滚动位置
@@ -98,9 +93,7 @@ const Timeline: React.FC<TimelineProps> = ({ commits, filter, onFilterChange }) 
       commit.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
       commit.author.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesAuthor = !selectedAuthor || commit.author === selectedAuthor;
-    
-    return matchesSearch && matchesAuthor;
+    return matchesSearch;
   });
 
   const formatDate = (timestamp: string) => {
@@ -137,19 +130,6 @@ const Timeline: React.FC<TimelineProps> = ({ commits, filter, onFilterChange }) 
             onChange={(e) => handleSearchChange(e.target.value)}
             className="search-input"
           />
-        </div>
-        
-        <div className="filter-group">
-          <select
-            value={selectedAuthor}
-            onChange={(e) => handleAuthorChange(e.target.value)}
-            className="author-select"
-          >
-            <option value="">所有作者</option>
-            {authors.map(author => (
-              <option key={author} value={author}>{author}</option>
-            ))}
-          </select>
         </div>
       </div>
 

@@ -12,6 +12,7 @@ function App() {
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [statistics, setStatistics] = useState<Statistics | null>(null);
   const [timeline, setTimeline] = useState<CommitData[]>([]);
+  const [allAuthors, setAllAuthors] = useState<string[]>([]); // 添加这行来存储所有作者
   const [loading, setLoading] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState<{current: number, total: number, message: string} | null>(null);
   const [activeTab, setActiveTab] = useState<'charts' | 'timeline'>(() => {
@@ -70,6 +71,25 @@ function App() {
     loadRepositories();
   }, []);
 
+  // 初始化所有作者列表
+  useEffect(() => {
+    const loadAllAuthors = async () => {
+      try {
+        const allCommits = await invoke<CommitData[]>('get_commit_timeline', {
+          startDate: undefined,
+          endDate: undefined,
+          author: undefined,
+          repositoryId: undefined
+        });
+        setAllAuthors(Array.from(new Set(allCommits.map(c => c.author))).sort());
+      } catch (error) {
+        console.error('Failed to load all authors:', error);
+      }
+    };
+    
+    loadAllAuthors();
+  }, []);
+
   // 保存筛选条件到 localStorage
   useEffect(() => {
     localStorage.setItem('git-stats-filter', JSON.stringify(filter));
@@ -104,6 +124,16 @@ function App() {
       
       setStatistics(stats);
       setTimeline(timelineData);
+      
+      // 更新所有作者列表（不考虑当前筛选条件）
+      const allCommits = await invoke<CommitData[]>('get_commit_timeline', {
+        startDate: undefined,
+        endDate: undefined,
+        author: undefined,
+        repositoryId: filter.repository_id // 只考虑仓库筛选
+      });
+      
+      setAllAuthors(Array.from(new Set(allCommits.map(c => c.author))).sort());
     } catch (error) {
       console.error('Failed to load data:', error);
     }
@@ -350,12 +380,15 @@ function App() {
           </div>
           <div className="filter-group">
             <label>作者:</label>
-            <input
-              type="text"
-              placeholder="输入作者名"
+            <select
               value={filter.author || ''}
               onChange={(e) => setFilter(prev => ({ ...prev, author: e.target.value || undefined }))}
-            />
+            >
+              <option value="">所有作者</option>
+              {allAuthors.map(author => (
+                <option key={author} value={author}>{author}</option>
+              ))}
+            </select>
           </div>
           <div className="filter-group">
             <label>仓库:</label>
@@ -444,14 +477,12 @@ function App() {
               <Timeline 
                 commits={timeline} 
                 filter={{
-                  searchTerm: filter.search_term,
-                  author: filter.author
+                  searchTerm: filter.search_term
                 }}
                 onFilterChange={(newFilter) => {
                   setFilter(prev => ({
                     ...prev,
-                    search_term: newFilter.searchTerm,
-                    author: newFilter.author
+                    search_term: newFilter.searchTerm
                   }));
                 }}
               />
