@@ -67,6 +67,14 @@ pub struct DailyStats {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct WeeklyStats {
+    pub weekday: i32, // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    pub additions: i32,
+    pub deletions: i32,
+    pub commits: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AuthorStats {
     pub additions: i32,
     pub deletions: i32,
@@ -84,6 +92,7 @@ pub struct RepositoryStats {
 pub struct Statistics {
     pub hourly: Vec<HourlyStats>,
     pub daily: Vec<DailyStats>,
+    pub weekly: Vec<WeeklyStats>,
     pub total_commits: i32,
     pub total_additions: i32,
     pub total_deletions: i32,

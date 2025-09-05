@@ -44,9 +44,17 @@ export interface DailyStats {
   commits: number;
 }
 
+export interface WeeklyStats {
+  weekday: number; // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  additions: number;
+  deletions: number;
+  commits: number;
+}
+
 export interface Statistics {
   hourly: HourlyStats[];
   daily: DailyStats[];
+  weekly: WeeklyStats[];
   total_commits: number;
   total_additions: number;
   total_deletions: number;

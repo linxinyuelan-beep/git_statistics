@@ -275,6 +275,32 @@ pub async fn get_statistics(pool: &SqlitePool, filter: &TimeFilter) -> Result<St
         })
         .collect();
 
+    // Get weekly stats (convert UTC to local time for proper weekday grouping)
+    let weekly_query = format!(
+        "SELECT strftime('%w', timestamp, 'localtime') as weekday, 
+         SUM(additions) as additions, 
+         SUM(deletions) as deletions, 
+         COUNT(*) as commits 
+         {} GROUP BY weekday ORDER BY weekday",
+        base_query
+    );
+    
+    let mut query_builder = sqlx::query(&weekly_query);
+    for param in &params {
+        query_builder = query_builder.bind(param);
+    }
+    
+    let weekly_rows = query_builder.fetch_all(pool).await?;
+    let weekly: Vec<WeeklyStats> = weekly_rows
+        .into_iter()
+        .map(|row| WeeklyStats {
+            weekday: row.get::<String, _>("weekday").parse().unwrap_or(0),
+            additions: row.get("additions"),
+            deletions: row.get("deletions"),
+            commits: row.get("commits"),
+        })
+        .collect();
+
     // Get total stats
     let total_query = format!(
         "SELECT SUM(additions) as total_additions, 
@@ -351,6 +377,7 @@ pub async fn get_statistics(pool: &SqlitePool, filter: &TimeFilter) -> Result<St
     Ok(Statistics {
         hourly,
         daily,
+        weekly,
         total_commits,
         total_additions,
         total_deletions,

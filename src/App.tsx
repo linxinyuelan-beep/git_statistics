@@ -199,7 +199,7 @@ function App() {
 
           <div className="tab-content">
             {activeTab === 'charts' && (
-              <StatisticsCharts statistics={statistics} />
+              <StatisticsCharts statistics={statistics} filter={filter} />
             )}
             {activeTab === 'timeline' && (
               <Timeline commits={timeline} />
