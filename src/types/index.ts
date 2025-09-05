@@ -90,4 +90,5 @@ export interface TimeFilter {
   end_date?: string;
   author?: string;
   repository_id?: number;
+  searchTerm?: string;
 }

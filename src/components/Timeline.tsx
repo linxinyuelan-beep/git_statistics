@@ -99,8 +99,6 @@ const Timeline: React.FC<TimelineProps> = ({ commits, filter, onFilterChange }) 
     );
   }
 
-  const authors = Array.from(new Set(commits.map(c => c.author))).sort();
-  
   const filteredCommits = commits.filter(commit => {
     const matchesSearch = !searchTerm || 
       commit.message.toLowerCase().includes(searchTerm.toLowerCase()) ||

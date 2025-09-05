@@ -477,12 +477,12 @@ function App() {
               <Timeline 
                 commits={timeline} 
                 filter={{
-                  searchTerm: filter.search_term
+                  searchTerm: filter.searchTerm
                 }}
                 onFilterChange={(newFilter) => {
                   setFilter(prev => ({
                     ...prev,
-                    search_term: newFilter.searchTerm
+                    searchTerm: newFilter.searchTerm
                   }));
                 }}
               />
