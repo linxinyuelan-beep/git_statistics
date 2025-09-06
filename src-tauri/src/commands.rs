@@ -233,6 +233,7 @@ pub async fn get_statistics(
     start_date: Option<String>,
     end_date: Option<String>,
     author: Option<String>,
+    exclude_authors: Option<Vec<String>>,
     repository_id: Option<i64>
 ) -> Result<Statistics, String> {
     let pool = get_db_pool(&app_handle).await.map_err(|e| e.to_string())?;
@@ -243,6 +244,7 @@ pub async fn get_statistics(
         end_date: end_date.and_then(|s| chrono::DateTime::parse_from_rfc3339(&s).ok())
             .map(|dt| dt.with_timezone(&chrono::Utc)),
         author,
+        exclude_authors,
         repository_id,
     };
     
@@ -259,6 +261,7 @@ pub async fn get_commit_timeline(
     start_date: Option<String>,
     end_date: Option<String>,
     author: Option<String>,
+    exclude_authors: Option<Vec<String>>,
     repository_id: Option<i64>
 ) -> Result<Vec<Commit>, String> {
     let pool = get_db_pool(&app_handle).await.map_err(|e| e.to_string())?;
@@ -269,6 +272,7 @@ pub async fn get_commit_timeline(
         end_date: end_date.and_then(|s| chrono::DateTime::parse_from_rfc3339(&s).ok())
             .map(|dt| dt.with_timezone(&chrono::Utc)),
         author,
+        exclude_authors,
         repository_id,
     };
     

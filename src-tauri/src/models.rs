@@ -167,5 +167,6 @@ pub struct TimeFilter {
     pub start_date: Option<chrono::DateTime<chrono::Utc>>,
     pub end_date: Option<chrono::DateTime<chrono::Utc>>,
     pub author: Option<String>,
+    pub exclude_authors: Option<Vec<String>>,
     pub repository_id: Option<i64>,
 }

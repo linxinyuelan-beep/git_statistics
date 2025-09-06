@@ -35,7 +35,8 @@ function App() {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     return {
-      start_date: thirtyDaysAgo.toISOString().split('T')[0]
+      start_date: thirtyDaysAgo.toISOString().split('T')[0],
+      exclude_authors: []
     };
   });
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
@@ -118,12 +119,14 @@ function App() {
           startDate,
           endDate,
           author: filter.author,
+          excludeAuthors: filter.exclude_authors,
           repositoryId: filter.repository_id
         }),
         invoke<CommitData[]>('get_commit_timeline', {
           startDate,
           endDate,
           author: filter.author,
+          excludeAuthors: filter.exclude_authors,
           repositoryId: filter.repository_id
         })
       ]);
@@ -136,6 +139,7 @@ function App() {
         startDate: undefined,
         endDate: undefined,
         author: undefined,
+        excludeAuthors: undefined,
         repositoryId: filter.repository_id // 只考虑仓库筛选
       });
       
@@ -338,6 +342,21 @@ function App() {
               onChange={(e) => setFilter(prev => ({ ...prev, author: e.target.value || undefined }))}
             >
               <option value="">所有作者</option>
+              {allAuthors.map(author => (
+                <option key={author} value={author}>{author}</option>
+              ))}
+            </select>
+          </div>
+          <div className="filter-group">
+            <label>排除作者:</label>
+            <select
+              value={filter.exclude_authors?.[0] || ''}
+              onChange={(e) => setFilter(prev => ({
+                ...prev,
+                exclude_authors: e.target.value ? [e.target.value] : []
+              }))}
+            >
+              <option value="">不排除</option>
               {allAuthors.map(author => (
                 <option key={author} value={author}>{author}</option>
               ))}

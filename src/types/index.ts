@@ -121,6 +121,7 @@ export interface TimeFilter {
   start_date?: string;
   end_date?: string;
   author?: string;
+  exclude_authors?: string[];
   repository_id?: number;
   searchTerm?: string;
 }

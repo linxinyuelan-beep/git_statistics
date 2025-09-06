@@ -230,6 +230,16 @@ pub async fn get_commit_timeline(pool: &SqlitePool, filter: &TimeFilter) -> Resu
         params.push(author.clone());
     }
     
+    if let Some(exclude_authors) = &filter.exclude_authors {
+        if !exclude_authors.is_empty() {
+            let placeholders: Vec<String> = exclude_authors.iter().map(|_| "?".to_string()).collect();
+            query.push_str(&format!(" AND author NOT IN ({})", placeholders.join(",")));
+            for author in exclude_authors {
+                params.push(author.clone());
+            }
+        }
+    }
+    
     if let Some(repository_id) = filter.repository_id {
         query.push_str(" AND repository_id = ?");
         params.push(repository_id.to_string());
@@ -264,6 +274,16 @@ pub async fn get_statistics(pool: &SqlitePool, filter: &TimeFilter) -> Result<St
     if let Some(author) = &filter.author {
         base_query.push_str(" AND author = ?");
         params.push(author.clone());
+    }
+    
+    if let Some(exclude_authors) = &filter.exclude_authors {
+        if !exclude_authors.is_empty() {
+            let placeholders: Vec<String> = exclude_authors.iter().map(|_| "?".to_string()).collect();
+            base_query.push_str(&format!(" AND author NOT IN ({})", placeholders.join(",")));
+            for author in exclude_authors {
+                params.push(author.clone());
+            }
+        }
     }
     
     if let Some(repository_id) = filter.repository_id {
@@ -602,6 +622,12 @@ pub async fn get_statistics(pool: &SqlitePool, filter: &TimeFilter) -> Result<St
             if let Some(author) = &filter.author {
                 conditions.push_str(" AND c.author = ?");
             }
+            if let Some(exclude_authors) = &filter.exclude_authors {
+                if !exclude_authors.is_empty() {
+                    let placeholders: Vec<String> = exclude_authors.iter().map(|_| "?".to_string()).collect();
+                    conditions.push_str(&format!(" AND c.author NOT IN ({})", placeholders.join(",")));
+                }
+            }
             if let Some(repository_id) = filter.repository_id {
                 conditions.push_str(" AND c.repository_id = ?");
             }
@@ -613,6 +639,12 @@ pub async fn get_statistics(pool: &SqlitePool, filter: &TimeFilter) -> Result<St
     // Bind parameters for the file changes query
     for param in &params {
         query_builder = query_builder.bind(param);
+    }
+    // Bind additional parameters for exclude_authors if needed
+    if let Some(exclude_authors) = &filter.exclude_authors {
+        for author in exclude_authors {
+            query_builder = query_builder.bind(author);
+        }
     }
     
     let hot_files_rows = query_builder.fetch_all(pool).await?;
