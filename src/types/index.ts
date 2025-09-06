@@ -17,6 +17,7 @@ export interface CommitData {
   deletions: number;
   files_changed: number;
   branch?: string;
+  remote_url?: string;
 }
 
 export interface FileChange {
@@ -27,6 +28,7 @@ export interface FileChange {
 }
 
 export interface CommitDetail extends CommitData {
+  remote_url?: string;
   file_changes: FileChange[];
 }
 

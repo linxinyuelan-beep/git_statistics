@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CommitData } from '../types';
+import { convertGitUrlToGitLabCommitUrl } from '../utils/gitUrlConverter';
 import { useNavigate } from 'react-router-dom';
+import { open } from '@tauri-apps/api/shell';
 
 interface TimelineProps {
   commits: CommitData[];
@@ -130,6 +132,17 @@ const Timeline: React.FC<TimelineProps> = ({ commits, filter, onFilterChange }) 
     navigate(`/commit/${commit.repository_id}/${commit.id}`);
   };
 
+  // Helper function to generate GitLab URL
+  const getGitLabUrl = (commit: CommitData): string | null => {
+    if (!commit.remote_url) return null;
+    try {
+      return convertGitUrlToGitLabCommitUrl(commit.remote_url, commit.id);
+    } catch (error) {
+      console.error('Error generating GitLab URL:', error);
+      return null;
+    }
+  };
+
   return (
     <div className="timeline-container">
       <div className="timeline-section-header" onClick={toggleCollapse}>
@@ -183,6 +196,24 @@ const Timeline: React.FC<TimelineProps> = ({ commits, filter, onFilterChange }) 
                 <span className="repository-badge">{commit.repository_name}</span>
                 {commit.branch && (
                   <span className="branch-badge">{commit.branch}</span>
+                )}
+                {commit.remote_url && (
+                  <button 
+                    className="gitlab-link"
+                    onClick={async (e) => {
+                      try {
+                        e.stopPropagation();
+                        const gitLabUrl = convertGitUrlToGitLabCommitUrl(commit.remote_url!, commit.id);
+                        if (gitLabUrl) {
+                          await open(gitLabUrl);
+                        }
+                      } catch (error) {
+                        console.error('Error opening GitLab URL:', error);
+                      }
+                    }}
+                  >
+                    在线查看
+                  </button>
                 )}
               </div>
               <div className="commit-time">{formatDate(commit.timestamp)}</div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { invoke } from '@tauri-apps/api/tauri';
 import { CommitDetail, FileChange } from '../types';
+import { convertGitUrlToGitLabCommitUrl } from '../utils/gitUrlConverter';
 import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { prism } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import diff from 'react-syntax-highlighter/dist/esm/languages/prism/diff';
@@ -166,6 +167,21 @@ const CommitDetailPage: React.FC = () => {
             <span className="detail-label">提交ID:</span>
             <span className="detail-value commit-id">{commitDetail.id}</span>
           </div>
+          {commitDetail.remote_url && (
+            <div className="detail-row">
+              <span className="detail-label">GitLab链接:</span>
+              <span className="detail-value">
+                <a 
+                  href={convertGitUrlToGitLabCommitUrl(commitDetail.remote_url, commitDetail.id) || '#'} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="gitlab-link"
+                >
+                  查看远程提交
+                </a>
+              </span>
+            </div>
+          )}
         </div>
         
         <div className="commit-detail-message">

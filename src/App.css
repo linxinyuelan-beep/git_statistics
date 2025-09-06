@@ -886,6 +886,25 @@ body {
   color: #333;
 }
 
+.gitlab-link {
+  color: #007acc;
+  text-decoration: none;
+  font-weight: 500;
+  padding: 0.1rem 0.4rem;
+  border: 1px solid #007acc;
+  border-radius: 3px;
+  transition: all 0.2s ease;
+  font-size: 0.75rem;
+  margin-left: 0.5rem;
+  background: transparent;
+  cursor: pointer;
+}
+
+.gitlab-link:hover {
+  background-color: #007acc;
+  color: white;
+}
+
 .commit-detail-page .commit-id {
   font-family: monospace;
   font-size: 0.9rem;

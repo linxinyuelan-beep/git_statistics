@@ -35,6 +35,28 @@ impl GitAnalyzer {
         })
     }
 
+    pub fn get_remote_url(&self) -> Option<String> {
+        // Try to get the origin remote URL
+        if let Ok(remote) = self.repo.find_remote("origin") {
+            if let Some(url) = remote.url() {
+                return Some(url.to_string());
+            }
+        }
+        
+        // If origin doesn't exist, try to get any remote URL
+        if let Ok(remotes) = self.repo.remotes() {
+            for remote_name in remotes.iter().flatten() {
+                if let Ok(remote) = self.repo.find_remote(remote_name) {
+                    if let Some(url) = remote.url() {
+                        return Some(url.to_string());
+                    }
+                }
+            }
+        }
+        
+        None
+    }
+
     pub fn analyze_commits(&self, since: Option<chrono::DateTime<chrono::Utc>>) -> Result<Vec<AnalyzedCommit>> {
         let mut revwalk = self.repo.revwalk()?;
         // Push all local branches instead of just HEAD
@@ -97,6 +119,7 @@ impl GitAnalyzer {
                 deletions,
                 files_changed,
                 branch: Some(branch),
+                remote_url: None, // This will be filled when retrieving from database
             };
 
             commits.push(AnalyzedCommit {
@@ -150,6 +173,9 @@ impl GitAnalyzer {
         // Get current branch name if possible
         let branch = self.get_commit_branch(&commit)?;
 
+        // Get remote URL
+        let remote_url = self.get_remote_url();
+
         // Calculate diff stats and get file changes
         let (additions, deletions, files_changed, file_changes) = self.get_detailed_commit_stats(&commit)?;
 
@@ -173,6 +199,7 @@ impl GitAnalyzer {
             deletions,
             files_changed,
             branch: Some(branch),
+            remote_url,
             file_changes: model_file_changes,
         })
     }
@@ -322,4 +349,29 @@ pub fn analyze_repository(repository: Repository, since: Option<chrono::DateTime
 
     let analyzer = GitAnalyzer::new(repository)?;
     analyzer.analyze_commits(since)
+}
+
+// Static method to get remote URL for a repository path
+pub fn get_remote_url_for_path(repo_path: &str) -> Option<String> {
+    if let Ok(repo) = git2::Repository::open(repo_path) {
+        // Try to get the origin remote URL
+        if let Ok(remote) = repo.find_remote("origin") {
+            if let Some(url) = remote.url() {
+                return Some(url.to_string());
+            }
+        }
+        
+        // If origin doesn't exist, try to get any remote URL
+        if let Ok(remotes) = repo.remotes() {
+            for remote_name in remotes.iter().flatten() {
+                if let Ok(remote) = repo.find_remote(remote_name) {
+                    if let Some(url) = remote.url() {
+                        return Some(url.to_string());
+                    }
+                }
+            }
+        }
+    }
+    
+    None
 }

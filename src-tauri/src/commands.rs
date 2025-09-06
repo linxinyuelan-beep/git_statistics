@@ -276,7 +276,7 @@ pub async fn get_commit_timeline(
         repository_id,
     };
     
-    let commits = database::get_commit_timeline(&pool, &filter)
+    let commits = database::get_commit_timeline_with_remote_urls(&pool, &filter)
         .await
         .map_err(|e| format!("获取提交时间线失败: {}", e))?;
     

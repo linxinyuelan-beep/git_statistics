@@ -257,6 +257,31 @@ pub async fn get_commit_timeline(pool: &SqlitePool, filter: &TimeFilter) -> Resu
     Ok(commits)
 }
 
+pub async fn get_commit_timeline_with_remote_urls(pool: &SqlitePool, filter: &TimeFilter) -> Result<Vec<Commit>> {
+    // First get all repositories to map repository_id to path
+    let repositories = get_repositories(pool).await?;
+    let repo_map: std::collections::HashMap<i64, String> = repositories
+        .into_iter()
+        .map(|repo| (repo.id, repo.path))
+        .collect();
+    
+    // Get commits
+    let commits = get_commit_timeline(pool, filter).await?;
+    
+    // Add remote URLs to commits
+    let commits_with_urls = commits
+        .into_iter()
+        .map(|mut commit| {
+            if let Some(repo_path) = repo_map.get(&commit.repository_id) {
+                commit.remote_url = crate::git_analyzer::get_remote_url_for_path(repo_path);
+            }
+            commit
+        })
+        .collect();
+        
+    Ok(commits_with_urls)
+}
+
 pub async fn get_statistics(pool: &SqlitePool, filter: &TimeFilter) -> Result<Statistics> {
     let mut base_query = "FROM commits WHERE 1=1".to_string();
     let mut params: Vec<String> = Vec::new();

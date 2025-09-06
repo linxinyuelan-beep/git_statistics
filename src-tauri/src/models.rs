@@ -22,6 +22,9 @@ pub struct Commit {
     pub deletions: i32,
     pub files_changed: i32,
     pub branch: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[sqlx(default)]
+    pub remote_url: Option<String>,
 }
 
 // New struct for file changes
@@ -47,6 +50,7 @@ pub struct CommitDetail {
     pub deletions: i32,
     pub files_changed: i32,
     pub branch: Option<String>,
+    pub remote_url: Option<String>,
     pub file_changes: Vec<FileChange>,
 }
 
