@@ -1,8 +1,8 @@
-use git2::{Repository as GitRepository, DiffOptions, DiffFormat, DiffLineType};
+use git2::{Repository as GitRepository, DiffOptions, DiffFormat, DiffLineType, Oid};
 use crate::models::{Commit, Repository};
 use anyhow::{Result, Context};
 use std::path::Path;
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 
 // New struct to hold file change information
 #[derive(Debug, Clone)]
@@ -22,6 +22,7 @@ pub struct AnalyzedCommit {
 pub struct GitAnalyzer {
     repo: GitRepository,
     repository_info: Repository,
+    commit_to_branches: HashMap<Oid, Vec<String>>,
 }
 
 impl GitAnalyzer {
@@ -29,10 +30,91 @@ impl GitAnalyzer {
         let repo = GitRepository::open(&repository_info.path)
             .context(format!("Failed to open git repository at {}", repository_info.path))?;
         
-        Ok(GitAnalyzer {
+        let mut analyzer = GitAnalyzer {
             repo,
             repository_info,
-        })
+            commit_to_branches: HashMap::new(),
+        };
+        
+        // Build commit to branches mapping
+        analyzer.build_commit_branch_mapping()?;
+        
+        Ok(analyzer)
+    }
+
+    fn build_commit_branch_mapping(&mut self) -> Result<()> {
+        // Get current branch name
+        let current_branch = self.get_current_branch_name();
+        
+        // Process local branches
+        if let Ok(branches) = self.repo.branches(Some(git2::BranchType::Local)) {
+            for branch_result in branches {
+                if let Ok((branch, _)) = branch_result {
+                    if let Ok(Some(branch_name)) = branch.name() {
+                        // Walk the branch history
+                        let branch_ref = branch.get();
+                        if let Some(oid) = branch_ref.target() {
+                            let mut revwalk = self.repo.revwalk()?;
+                            revwalk.push(oid)?;
+                            revwalk.set_sorting(git2::Sort::TOPOLOGICAL)?;
+                            
+                            for commit_oid in revwalk {
+                                if let Ok(commit_oid) = commit_oid {
+                                    self.commit_to_branches
+                                        .entry(commit_oid)
+                                        .or_insert_with(Vec::new)
+                                        .push(branch_name.to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Process remote branches
+        if let Ok(branches) = self.repo.branches(Some(git2::BranchType::Remote)) {
+            for branch_result in branches {
+                if let Ok((branch, _)) = branch_result {
+                    if let Ok(Some(branch_name)) = branch.name() {
+                        // Clean up remote branch name (remove origin/ prefix)
+                        let clean_name = branch_name.strip_prefix("origin/").unwrap_or(branch_name);
+                        
+                        // Walk the branch history
+                        let branch_ref = branch.get();
+                        if let Some(oid) = branch_ref.target() {
+                            let mut revwalk = self.repo.revwalk()?;
+                            revwalk.push(oid)?;
+                            revwalk.set_sorting(git2::Sort::TOPOLOGICAL)?;
+                            
+                            for commit_oid in revwalk {
+                                if let Ok(commit_oid) = commit_oid {
+                                    let branches = self.commit_to_branches
+                                        .entry(commit_oid)
+                                        .or_insert_with(Vec::new);
+                                    
+                                    // Only add remote branch if no local branch exists
+                                    if !branches.iter().any(|b| b == clean_name) {
+                                        branches.push(format!("origin/{}", clean_name));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        Ok(())
+    }
+    
+    fn get_current_branch_name(&self) -> Option<String> {
+        if let Ok(head) = self.repo.head() {
+            if let Some(name) = head.shorthand() {
+                return Some(name.to_string());
+            }
+        }
+        None
     }
 
     pub fn get_remote_url(&self) -> Option<String> {
@@ -296,46 +378,65 @@ impl GitAnalyzer {
     }
 
     fn get_commit_branch(&self, commit: &git2::Commit) -> Result<String> {
-        // For performance reasons, we only identify branches for head commits
-        // This avoids expensive history walks for every commit
+        let commit_id = commit.id();
+        let current_branch = self.get_current_branch_name();
         
-        // Check local branches first
-        if let Ok(branches) = self.repo.branches(Some(git2::BranchType::Local)) {
-            for branch_result in branches {
-                if let Ok((branch, _)) = branch_result {
-                    // Check if this is the head commit of the branch
-                    if let Ok(branch_commit) = branch.get().peel_to_commit() {
-                        if branch_commit.id() == commit.id() {
-                            if let Ok(Some(name)) = branch.name() {
-                                return Ok(name.to_string());
-                            }
-                        }
+        if let Some(branches) = self.commit_to_branches.get(&commit_id) {
+            if branches.is_empty() {
+                return Ok("".to_string());
+            }
+            
+            // Priority selection logic:
+            // 1. Current branch (if commit belongs to it)
+            if let Some(ref current) = current_branch {
+                if branches.contains(current) {
+                    return Ok(current.clone());
+                }
+            }
+            
+            // 2. Local non-main branches (prefer feature branches)
+            for branch in branches {
+                if !branch.starts_with("origin/") && 
+                   !matches!(branch.as_str(), "main" | "master" | "develop" | "dev") {
+                    return Ok(branch.clone());
+                }
+            }
+            
+            // 3. Remote non-main branches
+            for branch in branches {
+                if branch.starts_with("origin/") {
+                    let clean_name = branch.strip_prefix("origin/").unwrap_or(branch);
+                    if !matches!(clean_name, "main" | "master" | "develop" | "dev") {
+                        return Ok(clean_name.to_string());
                     }
                 }
             }
-        }
-        
-        // Check remote branches
-        if let Ok(branches) = self.repo.branches(Some(git2::BranchType::Remote)) {
-            for branch_result in branches {
-                if let Ok((branch, _)) = branch_result {
-                    // Check if this is the head commit of the branch
-                    if let Ok(branch_commit) = branch.get().peel_to_commit() {
-                        if branch_commit.id() == commit.id() {
-                            if let Ok(Some(name)) = branch.name() {
-                                // Clean up remote branch name (remove origin/ prefix)
-                                let clean_name = name.strip_prefix("origin/").unwrap_or(name);
-                                return Ok(clean_name.to_string());
-                            }
-                        }
+            
+            // 4. Local main branches
+            for branch in branches {
+                if !branch.starts_with("origin/") && 
+                   matches!(branch.as_str(), "main" | "master" | "develop" | "dev") {
+                    return Ok(branch.clone());
+                }
+            }
+            
+            // 5. Remote main branches
+            for branch in branches {
+                if branch.starts_with("origin/") {
+                    let clean_name = branch.strip_prefix("origin/").unwrap_or(branch);
+                    if matches!(clean_name, "main" | "master" | "develop" | "dev") {
+                        return Ok(clean_name.to_string());
                     }
                 }
             }
+            
+            // 6. Fallback to first branch
+            if let Some(first_branch) = branches.first() {
+                let clean_name = first_branch.strip_prefix("origin/").unwrap_or(first_branch);
+                return Ok(clean_name.to_string());
+            }
         }
         
-        // For non-head commits, we return None to indicate no specific branch
-        // This will result in not showing branch badges for historical commits
-        // which is better than showing "unknown" for everything
         Ok("".to_string())
     }
 

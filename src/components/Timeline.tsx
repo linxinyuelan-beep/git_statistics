@@ -133,15 +133,15 @@ const Timeline: React.FC<TimelineProps> = ({ commits, filter, onFilterChange }) 
   };
 
   // Helper function to generate GitLab URL
-  const getGitLabUrl = (commit: CommitData): string | null => {
-    if (!commit.remote_url) return null;
-    try {
-      return convertGitUrlToGitLabCommitUrl(commit.remote_url, commit.id);
-    } catch (error) {
-      console.error('Error generating GitLab URL:', error);
-      return null;
-    }
-  };
+  // const getGitLabUrl = (commit: CommitData): string | null => {
+  //   if (!commit.remote_url) return null;
+  //   try {
+  //     return convertGitUrlToGitLabCommitUrl(commit.remote_url, commit.id);
+  //   } catch (error) {
+  //     console.error('Error generating GitLab URL:', error);
+  //     return null;
+  //   }
+  // };
 
   return (
     <div className="timeline-container">
