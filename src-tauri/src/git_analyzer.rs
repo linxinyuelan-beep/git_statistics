@@ -296,18 +296,18 @@ impl GitAnalyzer {
     }
 
     fn get_commit_branch(&self, commit: &git2::Commit) -> Result<String> {
-        // Try to find which branch this commit belongs to
-        let mut branch_name = "unknown".to_string();
+        // For performance reasons, we only identify branches for head commits
+        // This avoids expensive history walks for every commit
         
-        // Iterate through all local branches
+        // Check local branches first
         if let Ok(branches) = self.repo.branches(Some(git2::BranchType::Local)) {
             for branch_result in branches {
                 if let Ok((branch, _)) = branch_result {
-                    if let Ok(Some(branch_commit)) = branch.get().peel_to_commit().map(|c| c.into()) {
+                    // Check if this is the head commit of the branch
+                    if let Ok(branch_commit) = branch.get().peel_to_commit() {
                         if branch_commit.id() == commit.id() {
                             if let Ok(Some(name)) = branch.name() {
-                                branch_name = name.to_string();
-                                break;
+                                return Ok(name.to_string());
                             }
                         }
                     }
@@ -315,17 +315,17 @@ impl GitAnalyzer {
             }
         }
         
-        // If not found in local branches, check remote branches
-        if branch_name == "unknown" {
-            if let Ok(branches) = self.repo.branches(Some(git2::BranchType::Remote)) {
-                for branch_result in branches {
-                    if let Ok((branch, _)) = branch_result {
-                        if let Ok(Some(branch_commit)) = branch.get().peel_to_commit().map(|c| c.into()) {
-                            if branch_commit.id() == commit.id() {
-                                if let Ok(Some(name)) = branch.name() {
-                                    branch_name = name.to_string();
-                                    break;
-                                }
+        // Check remote branches
+        if let Ok(branches) = self.repo.branches(Some(git2::BranchType::Remote)) {
+            for branch_result in branches {
+                if let Ok((branch, _)) = branch_result {
+                    // Check if this is the head commit of the branch
+                    if let Ok(branch_commit) = branch.get().peel_to_commit() {
+                        if branch_commit.id() == commit.id() {
+                            if let Ok(Some(name)) = branch.name() {
+                                // Clean up remote branch name (remove origin/ prefix)
+                                let clean_name = name.strip_prefix("origin/").unwrap_or(name);
+                                return Ok(clean_name.to_string());
                             }
                         }
                     }
@@ -333,7 +333,10 @@ impl GitAnalyzer {
             }
         }
         
-        Ok(branch_name)
+        // For non-head commits, we return None to indicate no specific branch
+        // This will result in not showing branch badges for historical commits
+        // which is better than showing "unknown" for everything
+        Ok("".to_string())
     }
 
     pub fn is_valid_git_repo(path: &str) -> bool {

@@ -194,7 +194,7 @@ const Timeline: React.FC<TimelineProps> = ({ commits, filter, onFilterChange }) 
               <div className="commit-author">
                 <strong>{commit.author}</strong>
                 <span className="repository-badge">{commit.repository_name}</span>
-                {commit.branch && (
+                {commit.branch && commit.branch.trim() !== "" && (
                   <span className="branch-badge">{commit.branch}</span>
                 )}
                 {commit.remote_url && (
