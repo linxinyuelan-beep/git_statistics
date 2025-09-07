@@ -223,8 +223,10 @@ body {
   padding: 0.5rem 1rem;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   white-space: nowrap;
+  min-width: 140px;
+  text-align: center;
 }
 
 .header-actions button:hover:not(:disabled) {

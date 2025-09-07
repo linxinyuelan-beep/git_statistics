@@ -190,17 +190,20 @@ function App() {
 
   const handleForceRefreshData = async () => {
     setLoading(true);
-    setLoadingProgress({ current: 0, total: repositories.length, message: '开始全量刷新...' });
     
     try {
-      // Force scan all repositories (full scan)
-      for (let i = 0; i < repositories.length; i++) {
-        const repo = repositories[i];
-        // Update progress
+      // Determine if we're refreshing a single repository or all repositories
+      if (filter.repository_id) {
+        // Single repository refresh
+        const selectedRepo = repositories.find(repo => repo.id === filter.repository_id);
+        if (!selectedRepo) {
+          throw new Error('所选仓库未找到');
+        }
+        
         setLoadingProgress({ 
-          current: i, 
-          total: repositories.length, 
-          message: `正在刷新仓库: ${repo.name} (${i+1}/${repositories.length})` 
+          current: 0, 
+          total: 1, 
+          message: `开始全量刷新仓库: ${selectedRepo.name}` 
         });
         
         // For long-running repository scans, show fake progress
@@ -210,25 +213,65 @@ function App() {
           if (fakeProgressCurrent < fakeProgressTotal - 1) {
             fakeProgressCurrent += 1;
             setLoadingProgress({ 
-              current: i + (fakeProgressCurrent / fakeProgressTotal), 
-              total: repositories.length, 
-              message: `正在刷新仓库: ${repo.name} - ${fakeProgressCurrent}%` 
+              current: fakeProgressCurrent / fakeProgressTotal, 
+              total: 1, 
+              message: `正在刷新仓库: ${selectedRepo.name} - ${fakeProgressCurrent}%` 
             });
           }
         }, 50);
         
         try {
-          await invoke('force_scan_repository', { repositoryId: repo.id });
+          await invoke('force_scan_repository', { repositoryId: selectedRepo.id });
         } finally {
           clearInterval(fakeProgressInterval);
         }
+        
+        setLoadingProgress({ 
+          current: 1, 
+          total: 1, 
+          message: `刷新完成 ${selectedRepo.name}，正在加载数据...` 
+        });
+      } else {
+        // All repositories refresh
+        setLoadingProgress({ current: 0, total: repositories.length, message: '开始全量刷新所有仓库...' });
+        
+        // Force scan all repositories (full scan)
+        for (let i = 0; i < repositories.length; i++) {
+          const repo = repositories[i];
+          // Update progress
+          setLoadingProgress({ 
+            current: i, 
+            total: repositories.length, 
+            message: `正在刷新仓库: ${repo.name} (${i+1}/${repositories.length})` 
+          });
+          
+          // For long-running repository scans, show fake progress
+          let fakeProgressCurrent = 0;
+          const fakeProgressTotal = 100;
+          const fakeProgressInterval = setInterval(() => {
+            if (fakeProgressCurrent < fakeProgressTotal - 1) {
+              fakeProgressCurrent += 1;
+              setLoadingProgress({ 
+                current: i + (fakeProgressCurrent / fakeProgressTotal), 
+                total: repositories.length, 
+                message: `正在刷新仓库: ${repo.name} - ${fakeProgressCurrent}%` 
+              });
+            }
+          }, 50);
+          
+          try {
+            await invoke('force_scan_repository', { repositoryId: repo.id });
+          } finally {
+            clearInterval(fakeProgressInterval);
+          }
+        }
+        
+        setLoadingProgress({ 
+          current: repositories.length, 
+          total: repositories.length, 
+          message: '刷新完成，正在加载数据...' 
+        });
       }
-      
-      setLoadingProgress({ 
-        current: repositories.length, 
-        total: repositories.length, 
-        message: '刷新完成，正在加载数据...' 
-      });
       
       // Reload data with current filters
       await loadData();
@@ -242,17 +285,20 @@ function App() {
 
   const handleRefreshLast24Hours = async () => {
     setLoading(true);
-    setLoadingProgress({ current: 0, total: repositories.length, message: '开始刷新过去一天数据...' });
     
     try {
-      // Scan last 24 hours for all repositories
-      for (let i = 0; i < repositories.length; i++) {
-        const repo = repositories[i];
-        // Update progress
+      // Determine if we're refreshing a single repository or all repositories
+      if (filter.repository_id) {
+        // Single repository refresh
+        const selectedRepo = repositories.find(repo => repo.id === filter.repository_id);
+        if (!selectedRepo) {
+          throw new Error('所选仓库未找到');
+        }
+        
         setLoadingProgress({ 
-          current: i, 
-          total: repositories.length, 
-          message: `正在刷新仓库: ${repo.name} (${i+1}/${repositories.length})` 
+          current: 0, 
+          total: 1, 
+          message: `开始刷新仓库: ${selectedRepo.name} 过去一天数据` 
         });
         
         // For long-running repository scans, show fake progress
@@ -262,25 +308,65 @@ function App() {
           if (fakeProgressCurrent < fakeProgressTotal - 1) {
             fakeProgressCurrent += 1;
             setLoadingProgress({ 
-              current: i + (fakeProgressCurrent / fakeProgressTotal), 
-              total: repositories.length, 
-              message: `正在刷新仓库: ${repo.name} - ${fakeProgressCurrent}%` 
+              current: fakeProgressCurrent / fakeProgressTotal, 
+              total: 1, 
+              message: `正在刷新仓库: ${selectedRepo.name} - ${fakeProgressCurrent}%` 
             });
           }
         }, 50);
         
         try {
-          await invoke('scan_last_24_hours', { repositoryId: repo.id });
+          await invoke('scan_last_24_hours', { repositoryId: selectedRepo.id });
         } finally {
           clearInterval(fakeProgressInterval);
         }
+        
+        setLoadingProgress({ 
+          current: 1, 
+          total: 1, 
+          message: `刷新完成 ${selectedRepo.name}，正在加载数据...` 
+        });
+      } else {
+        // All repositories refresh
+        setLoadingProgress({ current: 0, total: repositories.length, message: '开始刷新所有仓库过去一天数据...' });
+        
+        // Scan last 24 hours for all repositories
+        for (let i = 0; i < repositories.length; i++) {
+          const repo = repositories[i];
+          // Update progress
+          setLoadingProgress({ 
+            current: i, 
+            total: repositories.length, 
+            message: `正在刷新仓库: ${repo.name} (${i+1}/${repositories.length})` 
+          });
+          
+          // For long-running repository scans, show fake progress
+          let fakeProgressCurrent = 0;
+          const fakeProgressTotal = 100;
+          const fakeProgressInterval = setInterval(() => {
+            if (fakeProgressCurrent < fakeProgressTotal - 1) {
+              fakeProgressCurrent += 1;
+              setLoadingProgress({ 
+                current: i + (fakeProgressCurrent / fakeProgressTotal), 
+                total: repositories.length, 
+                message: `正在刷新仓库: ${repo.name} - ${fakeProgressCurrent}%` 
+              });
+            }
+          }, 50);
+          
+          try {
+            await invoke('scan_last_24_hours', { repositoryId: repo.id });
+          } finally {
+            clearInterval(fakeProgressInterval);
+          }
+        }
+        
+        setLoadingProgress({ 
+          current: repositories.length, 
+          total: repositories.length, 
+          message: '刷新完成，正在加载数据...' 
+        });
       }
-      
-      setLoadingProgress({ 
-        current: repositories.length, 
-        total: repositories.length, 
-        message: '刷新完成，正在加载数据...' 
-      });
       
       // Reload data with current filters
       await loadData();
@@ -299,10 +385,10 @@ function App() {
           <h1>Commit 统计</h1>
           <div className="header-actions">
             <button onClick={handleRefreshLast24Hours} disabled={loading}>
-              {loading ? '分析中...' : '刷新一天'}
+              {loading ? '分析中...' : filter.repository_id ? '刷新选中仓库一天' : '刷新所有一天'}
             </button>
             <button onClick={handleForceRefreshData} disabled={loading}>
-              {loading ? '分析中...' : '全量刷新'}
+              {loading ? '分析中...' : filter.repository_id ? '全量刷新选中仓库' : '全量刷新所有'}
             </button>
           </div>
         </div>
