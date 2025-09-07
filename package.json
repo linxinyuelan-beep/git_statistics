@@ -1,6 +1,6 @@
 {
   "name": "git-statistics",
-  "version": "0.1.0",
+  "version": "1.0.3",
   "description": "Git Commit 统计桌面应用",
   "type": "module",
   "scripts": {
