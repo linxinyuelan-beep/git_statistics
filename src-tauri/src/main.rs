@@ -12,6 +12,8 @@ use commands::*;
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_shell::init())
         .manage(commands::AppState::default())
         .setup(|app| {
             // Initialize database

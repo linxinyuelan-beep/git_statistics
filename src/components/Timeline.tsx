@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { CommitData } from '../types';
 import { convertGitUrlToGitLabCommitUrl } from '../utils/gitUrlConverter';
 import { useNavigate } from 'react-router-dom';
-import { open } from '@tauri-apps/api/shell';
+import { open } from '@tauri-apps/plugin-shell';
 
 interface TimelineProps {
   commits: CommitData[];
@@ -132,16 +132,6 @@ const Timeline: React.FC<TimelineProps> = ({ commits, filter, onFilterChange }) 
     navigate(`/commit/${commit.repository_id}/${commit.id}`);
   };
 
-  // Helper function to generate GitLab URL
-  // const getGitLabUrl = (commit: CommitData): string | null => {
-  //   if (!commit.remote_url) return null;
-  //   try {
-  //     return convertGitUrlToGitLabCommitUrl(commit.remote_url, commit.id);
-  //   } catch (error) {
-  //     console.error('Error generating GitLab URL:', error);
-  //     return null;
-  //   }
-  // };
 
   return (
     <div className="timeline-container">

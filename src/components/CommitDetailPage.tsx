@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 import { CommitDetail, FileChange } from '../types';
 import { convertGitUrlToGitLabCommitUrl } from '../utils/gitUrlConverter';
 import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';

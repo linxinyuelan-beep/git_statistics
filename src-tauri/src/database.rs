@@ -1,11 +1,11 @@
 use sqlx::{SqlitePool, Row};
-use tauri::{AppHandle, api::path};
+use tauri::{AppHandle, Manager};
 use crate::models::*;
 use anyhow::Result;
 
 pub async fn init_database(app_handle: &AppHandle) -> Result<SqlitePool> {
-    let app_dir = path::app_data_dir(&app_handle.config())
-        .ok_or_else(|| anyhow::anyhow!("Failed to get app data dir"))?;
+    let app_dir = app_handle.path().app_data_dir()
+        .map_err(|e| anyhow::anyhow!("Failed to get app data dir: {}", e))?;
     
     // Ensure the directory exists
     if let Err(e) = tokio::fs::create_dir_all(&app_dir).await {
@@ -95,8 +95,8 @@ pub async fn init_database(app_handle: &AppHandle) -> Result<SqlitePool> {
 }
 
 pub async fn get_db_pool(app_handle: &AppHandle) -> Result<SqlitePool> {
-    let app_dir = path::app_data_dir(&app_handle.config())
-        .ok_or_else(|| anyhow::anyhow!("Failed to get app data dir"))?;
+    let app_dir = app_handle.path().app_data_dir()
+        .map_err(|e| anyhow::anyhow!("Failed to get app data dir: {}", e))?;
     
     // Ensure the directory exists
     tokio::fs::create_dir_all(&app_dir).await?;
