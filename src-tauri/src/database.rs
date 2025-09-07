@@ -245,7 +245,7 @@ pub async fn get_commit_timeline(pool: &SqlitePool, filter: &TimeFilter) -> Resu
         params.push(repository_id.to_string());
     }
     
-    query.push_str(" ORDER BY timestamp DESC LIMIT 1000");
+    query.push_str(" ORDER BY timestamp DESC");
     
     let mut query_builder = sqlx::query_as::<_, Commit>(&query);
     
@@ -348,7 +348,7 @@ pub async fn get_statistics(pool: &SqlitePool, filter: &TimeFilter) -> Result<St
          SUM(additions) as additions, 
          SUM(deletions) as deletions, 
          COUNT(*) as commits 
-         {} GROUP BY date ORDER BY date DESC LIMIT 30",
+         {} GROUP BY date ORDER BY date DESC",
         base_query
     );
     
@@ -686,7 +686,7 @@ pub async fn get_statistics(pool: &SqlitePool, filter: &TimeFilter) -> Result<St
 
     // Get commit message words (basic word frequency analysis)
     let message_query = format!(
-        "SELECT message {} ORDER BY timestamp DESC LIMIT 1000",
+        "SELECT message {} ORDER BY timestamp DESC",
         base_query
     );
     

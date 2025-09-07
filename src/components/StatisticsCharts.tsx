@@ -132,28 +132,36 @@ const StatisticsCharts: React.FC<StatisticsChartsProps> = ({ statistics, filter 
   const getDailyChartOption = () => {
     // 计算时间范围天数
     let days = 7; // 默认7天
+    let startDateObj;
+    let endDateObj;
+    
     if (filter?.start_date) {
-      const startDate = new Date(filter.start_date);
-      const endDate = filter?.end_date ? new Date(filter.end_date) : new Date();
+      startDateObj = new Date(filter.start_date);
+      endDateObj = filter?.end_date ? new Date(filter.end_date) : new Date();
       // 计算天数差
-      const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+      const diffTime = Math.abs(endDateObj.getTime() - startDateObj.getTime());
       days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // 包含起始和结束日期
     } else if (filter?.end_date) {
-      // 如果只有结束日期，计算到今天的天数
-      const endDate = new Date(filter.end_date);
-      const today = new Date();
-      const diffTime = Math.abs(today.getTime() - endDate.getTime());
-      days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      // 如果只有结束日期，计算从end_date减去days天的范围
+      endDateObj = new Date(filter.end_date);
+      startDateObj = new Date(endDateObj);
+      startDateObj.setDate(endDateObj.getDate() - days + 1); // 向前推7天
+    } else {
+      // 默认情况：最近7天
+      endDateObj = new Date();
+      startDateObj = new Date(endDateObj);
+      startDateObj.setDate(endDateObj.getDate() - days + 1);
     }
     
-    // 生成日期列表
+    // 生成日期列表 - 使用实际的开始和结束日期
     const dates = [];
-    const endDate = new Date();
-    for (let i = days - 1; i >= 0; i--) {
-      const date = new Date(endDate);
-      date.setDate(endDate.getDate() - i);
-      const dateString = date.toISOString().split('T')[0];
+    let currentDate = new Date(startDateObj);
+    
+    // 循环从开始日期到结束日期
+    while (currentDate <= endDateObj) {
+      const dateString = currentDate.toISOString().split('T')[0];
       dates.push(dateString);
+      currentDate.setDate(currentDate.getDate() + 1);
     }
     
     // 为每个日期准备数据，如果没有记录则使用默认值
@@ -297,24 +305,42 @@ const StatisticsCharts: React.FC<StatisticsChartsProps> = ({ statistics, filter 
     };
   };
 
-  // Calendar view for last 30 days
+  // Calendar view for the selected date range or last 30 days
   const getCalendarChartOption = () => {
-    // Get last 30 days data
-    const dailyData = statistics.daily.slice(0, 30); // First 30 items (most recent)
-    const calendarData = dailyData.map(d => [d.date, d.additions + d.deletions]);
+    let startDate, endDate;
+    let daysRange = 30; // 默认30天
+    let titleText = '所选时间范围内代码变更日历';
     
-    // Calculate date range for last 30 days
-    const endDate = dailyData.length > 0 ? new Date(dailyData[0].date) : new Date();
-    const startDate = new Date(endDate);
-    startDate.setDate(startDate.getDate() - 29); // 30 days including today
+    // 使用过滤器中的日期范围（如果有）
+    if (filter?.start_date) {
+      startDate = new Date(filter.start_date);
+      endDate = filter?.end_date ? new Date(filter.end_date) : new Date();
+      const diffDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      daysRange = diffDays;
+      titleText = `${daysRange}天代码变更日历`;
+    } else {
+      // 默认显示最近30天
+      endDate = new Date();
+      startDate = new Date(endDate);
+      startDate.setDate(startDate.getDate() - 29); // 30天（包括今天）
+    }
     
-    // Format dates as strings for ECharts
+    // 格式化日期为字符串
     const startDateStr = startDate.toISOString().split('T')[0];
     const endDateStr = endDate.toISOString().split('T')[0];
+    
+    // 获取日期范围内的所有数据
+    // statistics.daily现在应该包含所有日期的数据，不限于30天
+    const dailyData = statistics.daily.filter(d => {
+      const date = new Date(d.date);
+      return date >= startDate && date <= endDate;
+    });
+    
+    const calendarData = dailyData.map(d => [d.date, d.additions + d.deletions]);
 
     return {
       title: {
-        text: '最近30天代码变更日历',
+        text: titleText,
         left: 'center'
       },
       tooltip: {

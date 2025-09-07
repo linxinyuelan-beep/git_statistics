@@ -6,6 +6,9 @@ import RepositoryManager from './components/RepositoryManager';
 import StatisticsCharts from './components/StatisticsCharts';
 import Timeline from './components/Timeline';
 import { Repository, CommitData, Statistics, TimeFilter } from './types';
+import DatePicker from 'react-datepicker';
+import dayjs from 'dayjs';
+import 'react-datepicker/dist/react-datepicker.css';
 
 function App() {
   const location = useLocation();
@@ -407,18 +410,43 @@ function App() {
         <div className="filter-section">
           <div className="filter-group">
             <label>开始日期:</label>
-            <input
-              type="date"
-              value={filter.start_date || ''}
-              onChange={(e) => setFilter(prev => ({ ...prev, start_date: e.target.value || undefined }))}
+            <DatePicker
+              selected={filter.start_date ? new Date(filter.start_date) : null}
+              onChange={(date: Date | null) => setFilter(prev => ({ 
+                ...prev, 
+                start_date: date ? dayjs(date).format('YYYY-MM-DD') : undefined 
+              }))}
+              dateFormat="yyyy-MM-dd"
+              placeholderText="选择开始日期"
+              className="date-picker"
+              maxDate={filter.end_date ? new Date(filter.end_date) : new Date()}
+              showMonthDropdown
+              showYearDropdown
+              dropdownMode="select"
+              todayButton="今天"
+              popperPlacement="bottom-end"
+              popperClassName="start-date-popper"
             />
           </div>
           <div className="filter-group">
             <label>结束日期:</label>
-            <input
-              type="date"
-              value={filter.end_date || ''}
-              onChange={(e) => setFilter(prev => ({ ...prev, end_date: e.target.value || undefined }))}
+            <DatePicker
+              selected={filter.end_date ? new Date(filter.end_date) : null}
+              onChange={(date: Date | null) => setFilter(prev => ({ 
+                ...prev, 
+                end_date: date ? dayjs(date).format('YYYY-MM-DD') : undefined 
+              }))}
+              dateFormat="yyyy-MM-dd"
+              placeholderText="选择结束日期"
+              className="date-picker"
+              minDate={filter.start_date ? new Date(filter.start_date) : undefined}
+              maxDate={new Date()}
+              showMonthDropdown
+              showYearDropdown
+              dropdownMode="select"
+              todayButton="今天"
+              popperPlacement="bottom-end"
+              popperClassName="end-date-popper"
             />
           </div>
           <div className="filter-group">
