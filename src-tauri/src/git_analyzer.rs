@@ -30,84 +30,15 @@ impl GitAnalyzer {
         let repo = GitRepository::open(&repository_info.path)
             .context(format!("Failed to open git repository at {}", repository_info.path))?;
         
-        let mut analyzer = GitAnalyzer {
+        let analyzer = GitAnalyzer {
             repo,
             repository_info,
-            commit_to_branches: HashMap::new(),
+            commit_to_branches: HashMap::new(), // 延迟初始化，只在需要时构建
         };
-        
-        // Build commit to branches mapping
-        analyzer.build_commit_branch_mapping()?;
         
         Ok(analyzer)
     }
 
-    fn build_commit_branch_mapping(&mut self) -> Result<()> {
-        // Get current branch name
-        let current_branch = self.get_current_branch_name();
-        
-        // Process local branches
-        if let Ok(branches) = self.repo.branches(Some(git2::BranchType::Local)) {
-            for branch_result in branches {
-                if let Ok((branch, _)) = branch_result {
-                    if let Ok(Some(branch_name)) = branch.name() {
-                        // Walk the branch history
-                        let branch_ref = branch.get();
-                        if let Some(oid) = branch_ref.target() {
-                            let mut revwalk = self.repo.revwalk()?;
-                            revwalk.push(oid)?;
-                            revwalk.set_sorting(git2::Sort::TOPOLOGICAL)?;
-                            
-                            for commit_oid in revwalk {
-                                if let Ok(commit_oid) = commit_oid {
-                                    self.commit_to_branches
-                                        .entry(commit_oid)
-                                        .or_insert_with(Vec::new)
-                                        .push(branch_name.to_string());
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        // Process remote branches
-        if let Ok(branches) = self.repo.branches(Some(git2::BranchType::Remote)) {
-            for branch_result in branches {
-                if let Ok((branch, _)) = branch_result {
-                    if let Ok(Some(branch_name)) = branch.name() {
-                        // Clean up remote branch name (remove origin/ prefix)
-                        let clean_name = branch_name.strip_prefix("origin/").unwrap_or(branch_name);
-                        
-                        // Walk the branch history
-                        let branch_ref = branch.get();
-                        if let Some(oid) = branch_ref.target() {
-                            let mut revwalk = self.repo.revwalk()?;
-                            revwalk.push(oid)?;
-                            revwalk.set_sorting(git2::Sort::TOPOLOGICAL)?;
-                            
-                            for commit_oid in revwalk {
-                                if let Ok(commit_oid) = commit_oid {
-                                    let branches = self.commit_to_branches
-                                        .entry(commit_oid)
-                                        .or_insert_with(Vec::new);
-                                    
-                                    // Only add remote branch if no local branch exists
-                                    if !branches.iter().any(|b| b == clean_name) {
-                                        branches.push(format!("origin/{}", clean_name));
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        Ok(())
-    }
-    
     fn get_current_branch_name(&self) -> Option<String> {
         if let Ok(head) = self.repo.head() {
             if let Some(name) = head.shorthand() {
@@ -241,8 +172,12 @@ impl GitAnalyzer {
     }
 
     pub fn get_commit_detail(&self, commit_id: &str) -> Result<crate::models::CommitDetail> {
+        let start_time = std::time::Instant::now();
+        println!("🔧 开始获取commit详情: {}", &commit_id[..8]);
+        
         let oid = git2::Oid::from_str(commit_id)?;
         let commit = self.repo.find_commit(oid)?;
+        println!("📝 找到commit对象耗时: {:?}", start_time.elapsed());
         
         let author = commit.author();
         let author_name = author.name().unwrap_or("Unknown").to_string();
@@ -253,13 +188,19 @@ impl GitAnalyzer {
             .unwrap_or_default();
 
         // Get current branch name if possible
+        let branch_start = std::time::Instant::now();
         let branch = self.get_commit_branch(&commit)?;
+        println!("🌿 获取分支信息耗时: {:?}", branch_start.elapsed());
 
         // Get remote URL
+        let remote_start = std::time::Instant::now();
         let remote_url = self.get_remote_url();
+        println!("🌍 获取远程URL耗时: {:?}", remote_start.elapsed());
 
         // Calculate diff stats and get file changes
+        let diff_start = std::time::Instant::now();
         let (additions, deletions, files_changed, file_changes) = self.get_detailed_commit_stats(&commit)?;
+        println!("📊 计算diff统计耗时: {:?}, 文件数: {}", diff_start.elapsed(), file_changes.len());
 
         // Convert FileChange to models::FileChange
         let model_file_changes = file_changes.into_iter().map(|fc| crate::models::FileChange {
@@ -287,13 +228,19 @@ impl GitAnalyzer {
     }
 
     fn get_detailed_commit_stats(&self, commit: &git2::Commit) -> Result<(i32, i32, i32, Vec<FileChange>)> {
+        let start_time = std::time::Instant::now();
+        println!("📈 开始计算详细diff统计");
+        
+        let tree_start = std::time::Instant::now();
         let tree = commit.tree()?;
         let parent_tree = if commit.parent_count() > 0 {
             Some(commit.parent(0)?.tree()?)
         } else {
             None
         };
+        println!("🌳 获取tree对象耗时: {:?}", tree_start.elapsed());
 
+        let diff_create_start = std::time::Instant::now();
         let mut diff_opts = DiffOptions::new();
         diff_opts.ignore_whitespace(true);
         diff_opts.ignore_blank_lines(true);
@@ -303,11 +250,17 @@ impl GitAnalyzer {
             Some(&tree),
             Some(&mut diff_opts),
         )?;
+        println!("🔄 创建diff对象耗时: {:?}", diff_create_start.elapsed());
 
+        let stats_start = std::time::Instant::now();
         let stats = diff.stats()?;
+        println!("📊 获取基础统计耗时: {:?}", stats_start.elapsed());
         
         // Collect file changes with diffs
         let mut file_changes: Vec<FileChange> = Vec::new();
+        
+        let print_start = std::time::Instant::now();
+        println!("🖨️  开始生成diff内容");
         
         diff.print(DiffFormat::Patch, |delta, _hunk, line| {
             let file_path = delta.new_file().path().or(delta.old_file().path())
@@ -368,6 +321,9 @@ impl GitAnalyzer {
             
             true
         })?;
+        
+        println!("🖨️  生成diff内容耗时: {:?}", print_start.elapsed());
+        println!("📈 总详细统计耗时: {:?}", start_time.elapsed());
 
         Ok((
             stats.insertions() as i32,
@@ -381,62 +337,97 @@ impl GitAnalyzer {
         let commit_id = commit.id();
         let current_branch = self.get_current_branch_name();
         
-        if let Some(branches) = self.commit_to_branches.get(&commit_id) {
-            if branches.is_empty() {
-                return Ok("".to_string());
-            }
-            
-            // Priority selection logic:
-            // 1. Current branch (if commit belongs to it)
-            if let Some(ref current) = current_branch {
-                if branches.contains(current) {
-                    return Ok(current.clone());
-                }
-            }
-            
-            // 2. Local non-main branches (prefer feature branches)
-            for branch in branches {
-                if !branch.starts_with("origin/") && 
-                   !matches!(branch.as_str(), "main" | "master" | "develop" | "dev") {
-                    return Ok(branch.clone());
-                }
-            }
-            
-            // 3. Remote non-main branches
-            for branch in branches {
-                if branch.starts_with("origin/") {
-                    let clean_name = branch.strip_prefix("origin/").unwrap_or(branch);
-                    if !matches!(clean_name, "main" | "master" | "develop" | "dev") {
-                        return Ok(clean_name.to_string());
+        // 优化：只检查HEAD分支是否指向该提交或其祖先
+        // 这样避免了为每个分支执行完整的revwalk，大大提高性能
+        
+        // 检查当前HEAD分支
+        if let Ok(head) = self.repo.head() {
+            if let Ok(head_commit) = head.peel_to_commit() {
+                if head_commit.id() == commit_id {
+                    if let Some(head_name) = head.shorthand() {
+                        return Ok(head_name.to_string());
                     }
                 }
-            }
-            
-            // 4. Local main branches
-            for branch in branches {
-                if !branch.starts_with("origin/") && 
-                   matches!(branch.as_str(), "main" | "master" | "develop" | "dev") {
-                    return Ok(branch.clone());
-                }
-            }
-            
-            // 5. Remote main branches
-            for branch in branches {
-                if branch.starts_with("origin/") {
-                    let clean_name = branch.strip_prefix("origin/").unwrap_or(branch);
-                    if matches!(clean_name, "main" | "master" | "develop" | "dev") {
-                        return Ok(clean_name.to_string());
+                
+                // 检查是否在当前分支的历史中（只检查有限的提交）
+                if let Some(oid) = head.target() {
+                    let mut revwalk = self.repo.revwalk()?;
+                    revwalk.push(oid)?;
+                    revwalk.set_sorting(git2::Sort::TOPOLOGICAL)?;
+                    
+                    // 限制搜索深度，避免在大型仓库中耗时过长
+                    let mut count = 0;
+                    const MAX_DEPTH: usize = 1000;
+                    
+                    for commit_oid in revwalk {
+                        if let Ok(commit_oid) = commit_oid {
+                            if commit_oid == commit_id {
+                                if let Some(head_name) = head.shorthand() {
+                                    return Ok(head_name.to_string());
+                                }
+                            }
+                        }
+                        
+                        count += 1;
+                        if count >= MAX_DEPTH {
+                            break;
+                        }
                     }
                 }
-            }
-            
-            // 6. Fallback to first branch
-            if let Some(first_branch) = branches.first() {
-                let clean_name = first_branch.strip_prefix("origin/").unwrap_or(first_branch);
-                return Ok(clean_name.to_string());
             }
         }
         
+        // 如果HEAD不匹配，尝试其他本地分支（同样限制搜索深度）
+        if let Ok(branches) = self.repo.branches(Some(git2::BranchType::Local)) {
+            for branch_result in branches {
+                if let Ok((branch, _)) = branch_result {
+                    if let Ok(Some(branch_name)) = branch.name() {
+                        // 跳过HEAD分支，因为我们已经检查过了
+                        if let Ok(head) = self.repo.head() {
+                            if let Some(head_name) = head.shorthand() {
+                                if branch_name == head_name {
+                                    continue;
+                                }
+                            }
+                        }
+                        
+                        // 检查该分支是否直接指向此提交
+                        if let Ok(branch_commit) = branch.get().peel_to_commit() {
+                            if branch_commit.id() == commit_id {
+                                return Ok(branch_name.to_string());
+                            }
+                            
+                            // 限制搜索深度以提高性能
+                            let branch_ref = branch.get();
+                            if let Some(oid) = branch_ref.target() {
+                                let mut revwalk = self.repo.revwalk()?;
+                                revwalk.push(oid)?;
+                                revwalk.set_sorting(git2::Sort::TOPOLOGICAL)?;
+                                
+                                let mut count = 0;
+                                const MAX_DEPTH: usize = 100;
+                                
+                                for commit_oid in revwalk {
+                                    if let Ok(commit_oid) = commit_oid {
+                                        if commit_oid == commit_id {
+                                            return Ok(branch_name.to_string());
+                                        }
+                                    }
+                                    
+                                    count += 1;
+                                    if count >= MAX_DEPTH {
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 简化处理：如果找不到精确匹配，返回空字符串
+        // 在commit detail页面中，分支信息不是关键信息
         Ok("".to_string())
     }
 
